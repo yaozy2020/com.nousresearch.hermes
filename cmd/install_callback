@@ -1,0 +1,146 @@
+#!/bin/bash
+
+### install_callback — 初始化 Hermes 数据目录
+### 只做目录创建 + 配置部署，不安装 Hermes 本体（从控制面板 UI 懒安装）
+### 这样 fnOS 应用安装永远成功，Hermes 安装可从 UI 重试
+
+export PATH=/var/apps/bunjs/target/bin:/var/apps/nodejs_v24/target/bin:$PATH
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1"
+}
+
+toast_err() {
+    if [ -n "${TRIM_TEMP_LOGFILE}" ]; then
+        echo "$*" > "$TRIM_TEMP_LOGFILE"
+    fi
+}
+
+# ---------------------------------------------------------------------------
+# 路径计算（与 main 保持一致）
+#   TRIM_PKGHOME = /var/apps/com.nousresearch.hermes/home (@apphome)
+# ---------------------------------------------------------------------------
+HERMES_DATA_DIR="${TRIM_PKGHOME}/data"
+INSTALL_DIR="${HERMES_DATA_DIR}/install"
+HOME_DIR="${HERMES_DATA_DIR}/home"
+RUNTIME_DIR="${HERMES_DATA_DIR}/runtime"
+STATE_DIR="${HERMES_DATA_DIR}/state"
+WORKSPACE_DIR="${HERMES_DATA_DIR}/workspace"
+LOG_DIR="${HERMES_DATA_DIR}/logs"
+VENV_DIR="${HERMES_DATA_DIR}/venv"
+CONFIG_DIR="${HERMES_DATA_DIR}/config"
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(dirname "$SCRIPT_DIR")"
+APP_DIR="${TRIM_APPDEST:-${APP_ROOT}/app}"
+VERSION_FILE="${APP_ROOT}/config/hermes-version.env"
+SOUL_MD_SRC="${APP_ROOT}/config/prompts/SOUL.md"
+
+# 读取版本
+HERMES_VERSION="0.16.2"
+if [ -f "${VERSION_FILE}" ]; then
+    . "${VERSION_FILE}"
+    HERMES_VERSION="${HERMES_VERSION:-0.16.2}"
+fi
+
+log_msg "=== Hermes install_callback started, version=${HERMES_VERSION} ==="
+
+# ---------------------------------------------------------------------------
+# 1. 创建目录结构（不使用 set -e，逐个创建并记录）
+# ---------------------------------------------------------------------------
+log_msg "Creating directory structure ..."
+mkdir -p "${INSTALL_DIR}" 2>/dev/null
+mkdir -p "${HOME_DIR}" 2>/dev/null
+mkdir -p "${RUNTIME_DIR}" 2>/dev/null
+mkdir -p "${STATE_DIR}" 2>/dev/null
+mkdir -p "${WORKSPACE_DIR}" 2>/dev/null
+mkdir -p "${LOG_DIR}" 2>/dev/null
+mkdir -p "${CONFIG_DIR}" 2>/dev/null
+mkdir -p "${VENV_DIR}" 2>/dev/null
+log_msg "Directories created"
+
+# ---------------------------------------------------------------------------
+# 2. 部署 SOUL.md
+# ---------------------------------------------------------------------------
+if [ -f "${SOUL_MD_SRC}" ]; then
+    cp "${SOUL_MD_SRC}" "${CONFIG_DIR}/SOUL.md" 2>/dev/null
+    log_msg "SOUL.md deployed"
+fi
+
+# ---------------------------------------------------------------------------
+# 3. 创建默认配置（如果不存在）
+# ---------------------------------------------------------------------------
+if [ ! -f "${CONFIG_DIR}/config.yaml" ]; then
+    cat > "${CONFIG_DIR}/config.yaml" << 'YAML'
+# Hermes Configuration
+# Managed by Hermes Control Panel
+
+model:
+  provider: openai
+  model: gpt-4o
+  base_url: https://api.openai.com/v1
+
+gateway:
+  enabled: false
+  channels: []
+
+dashboard:
+  enabled: false
+  port: 9119
+YAML
+    log_msg "Default config.yaml created"
+fi
+
+if [ ! -f "${CONFIG_DIR}/.env" ]; then
+    cat > "${CONFIG_DIR}/.env" << 'ENV'
+# Hermes Environment Variables
+# API keys and secrets stored here
+ENV
+    log_msg "Default .env created"
+fi
+
+# ---------------------------------------------------------------------------
+# 4. 写入版本信息
+# ---------------------------------------------------------------------------
+echo "${HERMES_VERSION}" > "${CONFIG_DIR}/../install/version.txt" 2>/dev/null || true
+
+# ---------------------------------------------------------------------------
+# 5. 检查 Python 可用性（仅记录，不阻断安装）
+# ---------------------------------------------------------------------------
+PYTHON_BIN=""
+for py in python3.12 python3.11 python3.10 python3; do
+    if command -v "${py}" >/dev/null 2>&1; then
+        PYTHON_BIN="${py}"
+        break
+    fi
+done
+
+if [ -z "${PYTHON_BIN}" ]; then
+    log_msg "WARNING: No Python found. Hermes can be installed later from Control Panel."
+else
+    log_msg "Python available: ${PYTHON_BIN} ($(${PYTHON_BIN} --version 2>&1))"
+    log_msg "Hermes will be installed from Control Panel on first use."
+fi
+
+# ---------------------------------------------------------------------------
+# 6. 创建 hermes wrapper（指向 venv，安装后生效）
+# ---------------------------------------------------------------------------
+SYSTEM_HERMES_WRAPPER="${TRIM_APPDEST}/bin/hermes"
+mkdir -p "${TRIM_APPDEST}/bin" 2>/dev/null
+cat > "${SYSTEM_HERMES_WRAPPER}" << WRAPPER
+#!/bin/bash
+export HERMES_HOME="${HERMES_DATA_DIR}/home"
+export HERMES_DATA="${HERMES_DATA_DIR}"
+export HERMES_WORKSPACE="${WORKSPACE_DIR}"
+export HERMES_CONFIG="${CONFIG_DIR}"
+if [ ! -x "${VENV_DIR}/bin/hermes" ]; then
+    echo "Hermes is not installed yet. Please install from Control Panel."
+    exit 1
+fi
+exec "${VENV_DIR}/bin/hermes" "\$@"
+WRAPPER
+chmod +x "${SYSTEM_HERMES_WRAPPER}" 2>/dev/null
+log_msg "Wrapper created at ${SYSTEM_HERMES_WRAPPER}"
+
+log_msg "=== Hermes install_callback completed successfully ==="
+exit 0

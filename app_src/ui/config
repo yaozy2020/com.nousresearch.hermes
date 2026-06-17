@@ -1,0 +1,18 @@
+{
+    ".url": {
+        "com.nousresearch.hermes.Application": {
+            "title": "Hermes AI 助手",
+            "icon": "images/icon.PNG",
+            "type": "iframe",
+            "protocol": "http",
+            "port": "",
+            "url": "/app/com-nousresearch-hermes",
+            "allUsers": false,
+            "gatewaySocket": "com.nousresearch.hermes.sock",
+            "gatewayPrefix": "/app/com-nousresearch-hermes",
+            "control": {
+                "accessPerm": "readonly"
+            }
+        }
+    }
+}

@@ -1,0 +1,1298 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hermes AI 助手</title>
+  <style>
+    :root {
+      /* Brand (default = OpenClaw blue) */
+      --brand-color: #2173DF;
+      --brand-color-dim: #1a5cb5;
+      --brand-color-soft: rgba(33, 115, 223, 0.12);
+
+      /* Light theme defaults (will be overridden when fnos-theme-mode=dark) */
+      --bg: #f6f8fb;
+      --card-bg: #ffffff;
+      --surface-2: #f0f3f8;
+      --border: #e3e7ee;
+      --text: #1f2430;
+      --text-2: #5f6675;
+      --text-3: #8a93a3;
+      --green: #16a34a;
+      --green-soft: rgba(22, 163, 74, 0.14);
+      --red: #dc2626;
+      --red-soft: rgba(220, 38, 38, 0.14);
+      --yellow: #f59e0b;
+      --yellow-soft: rgba(245, 158, 11, 0.16);
+      --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
+      --radius: 8px;
+    }
+
+    body[fnos-theme-mode="dark"], html[fnos-theme-mode="dark"] body,
+    body[data-app-theme="dark"] {
+      --bg: #0f1117;
+      --card-bg: #1a1d29;
+      --surface-2: #232636;
+      --border: #2c3142;
+      --text: #e6e8ef;
+      --text-2: #aab1c1;
+      --text-3: #6f7689;
+      --green: #22c55e;
+      --green-soft: rgba(34, 197, 94, 0.18);
+      --red: #ef4444;
+      --red-soft: rgba(239, 68, 68, 0.18);
+      --yellow: #fbbf24;
+      --yellow-soft: rgba(251, 191, 36, 0.18);
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35);
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* ───────── App layout ───────── */
+    .app { display: flex; min-height: 100vh; }
+    .sidebar {
+      width: 220px; flex-shrink: 0;
+      background: var(--card-bg);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      padding: 18px 12px;
+    }
+    .sidebar .brand {
+      display: flex; align-items: center; gap: 10px;
+      padding: 4px 8px 14px 8px;
+      margin-bottom: 8px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar .brand .logo {
+      width: 32px; height: 32px; border-radius: 8px;
+      background: var(--brand-color); color: #fff;
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 700; font-size: 16px;
+      box-shadow: 0 2px 6px var(--brand-color-soft);
+    }
+    .sidebar .brand .name { font-weight: 600; font-size: 15px; color: var(--text); }
+    .sidebar .brand .sub { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+
+    .nav { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 9px 12px; border-radius: 6px;
+      color: var(--text-2); cursor: pointer;
+      font-size: 14px;
+      transition: all .15s ease;
+      user-select: none;
+    }
+    .nav-item:hover { background: var(--surface-2); color: var(--text); }
+    .nav-item.active {
+      background: var(--brand-color-soft);
+      color: var(--brand-color);
+      font-weight: 600;
+    }
+    .nav-item svg { width: 16px; height: 16px; flex-shrink: 0; }
+
+    .sidebar .footer {
+      margin-top: auto; padding: 10px 8px 4px 8px;
+      border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--text-3);
+      line-height: 1.6;
+    }
+
+    .main { flex: 1; min-width: 0; overflow-y: auto; }
+    .main-inner { padding: 24px 28px; max-width: 1100px; margin: 0 auto; }
+
+    /* Page header */
+    .page-head {
+      display: flex; align-items: center; gap: 12px; margin-bottom: 18px;
+    }
+    .page-head h1 { font-size: 20px; font-weight: 600; color: var(--text); }
+    .page-head .sub { color: var(--text-2); font-size: 13px; }
+    .page-head .spacer { flex: 1; }
+
+    .pane { display: none; }
+    .pane.active { display: block; }
+
+    /* Card */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 18px 20px;
+      margin-bottom: 14px;
+    }
+    .card h3 {
+      font-size: 14px; font-weight: 600; color: var(--text);
+      display: flex; align-items: center; gap: 8px;
+      margin-bottom: 12px;
+    }
+    .card h3 svg { width: 16px; height: 16px; color: var(--brand-color); }
+
+    .card .muted { color: var(--text-2); font-size: 13px; }
+    .row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .row .spacer { flex: 1; }
+    .stack { display: flex; flex-direction: column; gap: 8px; }
+
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+    /* Mobile menu toggle (hidden on desktop) */
+    .mobile-menu-btn {
+      display: none;
+      position: fixed; top: 12px; left: 12px; z-index: 200;
+      width: 38px; height: 38px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
+      align-items: center; justify-content: center;
+      box-shadow: var(--shadow);
+    }
+    .mobile-menu-btn svg { width: 20px; height: 20px; color: var(--text); }
+    .sidebar-mask {
+      display: none;
+      position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      z-index: 90;
+    }
+    .sidebar-mask.show { display: block; }
+
+    /* Sidebar status LED (US-007) */
+    .sidebar-status {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 10px; margin: 6px 0 4px;
+      border-radius: 6px;
+      background: var(--surface-2);
+      font-size: 11px; color: var(--text-2);
+    }
+    .sidebar-status .leds {
+      display: flex; gap: 4px;
+    }
+    .sidebar-status .led {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--text-3);
+    }
+    .sidebar-status .led.on { background: var(--green); box-shadow: 0 0 4px var(--green); }
+    .sidebar-status .led.off { background: var(--red); }
+
+    /* Tablet (≤ 1024px) — narrow sidebar with icons */
+    @media (max-width: 1024px) {
+      .grid-3 { grid-template-columns: 1fr 1fr; }
+    }
+
+    /* Mobile (≤ 768px) — drawer sidebar */
+    @media (max-width: 768px) {
+      .grid-3 { grid-template-columns: 1fr; }
+      .mobile-menu-btn { display: flex; }
+      .main-inner { padding: 56px 14px 20px; }
+      .sidebar {
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: 240px; z-index: 100;
+        transform: translateX(-100%);
+        transition: transform .25s ease;
+        box-shadow: 4px 0 20px rgba(0,0,0,.15);
+      }
+      .sidebar.open { transform: translateX(0); }
+      .sidebar .brand .name,
+      .sidebar .brand .sub,
+      .sidebar .footer,
+      .nav-item span.label { display: inline; }
+      .nav-item { justify-content: flex-start; }
+      .page-head h1 { font-size: 18px; }
+      .card { padding: 14px 14px; }
+      /* Wizard: 移动端改竖排，每步独占一行 */
+      .wizard-progress {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 0;
+        padding: 4px 0 0;
+      }
+      .wizard-step {
+        flex: 0 0 auto;
+        padding: 8px 0;
+        gap: 12px;
+      }
+      .wizard-step .lbl { font-size: 13px; }
+      .wizard-line {
+        width: 2px; height: 14px;
+        margin: 0 0 0 13px;  /* 对齐圆点中心 (28px/2 - 1px) */
+        flex: 0 0 auto;
+      }
+      .editor { min-height: 200px; font-size: 12px; }
+      .row { gap: 6px; }
+      .btn { padding: 8px 12px; font-size: 13px; }  /* bigger touch targets */
+      .provider-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Small phone (≤ 380px) — ultra-compact */
+    @media (max-width: 380px) {
+      .main-inner { padding: 56px 10px 16px; }
+      .card { padding: 12px 12px; margin-bottom: 10px; }
+      .page-head { margin-bottom: 12px; }
+      /* 仍保持竖排，标签可见，去掉的是 inline 显示而非 label 本身 */
+      .wizard-step .lbl { display: inline; font-size: 12px; }
+      .wizard-line { height: 10px; }
+    }
+
+    /* Status badge */
+    .badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 3px 10px; border-radius: 999px;
+      font-size: 12px; font-weight: 500;
+    }
+    .badge.running { background: var(--green-soft); color: var(--green); }
+    .badge.stopped { background: var(--red-soft); color: var(--red); }
+    .badge.starting { background: var(--yellow-soft); color: var(--yellow); }
+    .badge.unknown { background: var(--surface-2); color: var(--text-3); }
+
+    .dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+    .dot.running { background: var(--green); box-shadow: 0 0 0 0 currentColor; animation: pulse 1.6s infinite; }
+    .dot.stopped { background: var(--text-3); }
+    .dot.starting { background: var(--yellow); animation: breathe 1.4s ease-in-out infinite; }
+
+    @keyframes pulse {
+      0% { box-shadow: 0 0 0 0 var(--green-soft); }
+      70% { box-shadow: 0 0 0 6px transparent; }
+      100% { box-shadow: 0 0 0 0 transparent; }
+    }
+    @keyframes breathe {
+      0%, 100% { opacity: 0.55; transform: scale(0.85); }
+      50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Buttons */
+    .btn {
+      padding: 7px 14px;
+      font-size: 13px; font-weight: 500;
+      border: 1px solid var(--border);
+      background: var(--card-bg); color: var(--text);
+      border-radius: 6px; cursor: pointer;
+      display: inline-flex; align-items: center; gap: 6px;
+      transition: all .15s ease;
+    }
+    .btn:hover:not(:disabled) { background: var(--surface-2); }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary {
+      background: var(--brand-color); color: #fff; border-color: var(--brand-color);
+    }
+    .btn-primary:hover:not(:disabled) { background: var(--brand-color-dim); border-color: var(--brand-color-dim); }
+    .btn-danger {
+      background: var(--red); color: #fff; border-color: var(--red);
+    }
+    .btn-danger:hover:not(:disabled) { filter: brightness(0.9); }
+    .btn-ghost { background: transparent; }
+    .btn-sm { padding: 5px 10px; font-size: 12px; }
+
+    /* KV list */
+    .kv { display: grid; grid-template-columns: 90px 1fr; gap: 6px 12px; font-size: 13px; }
+    .kv .k { color: var(--text-3); }
+    .kv .v { color: var(--text); font-family: 'SF Mono', Menlo, Consolas, monospace; word-break: break-all; }
+
+    /* Banner */
+    .banner {
+      background: var(--brand-color-soft);
+      border: 1px solid var(--brand-color);
+      color: var(--brand-color);
+      padding: 12px 14px;
+      border-radius: var(--radius);
+      display: flex; align-items: center; gap: 10px;
+      font-size: 13px;
+      margin-bottom: 14px;
+    }
+    .banner .spacer { flex: 1; }
+
+    /* Editor */
+    .editor-wrap { display: flex; flex-direction: column; gap: 14px; }
+    .editor-label { font-size: 13px; color: var(--text-2); margin-bottom: 6px; display: flex; gap: 8px; align-items: center; }
+    .editor {
+      width: 100%; min-height: 280px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 12px;
+      font-family: 'SF Mono', Menlo, Consolas, 'Courier New', monospace;
+      font-size: 12.5px; line-height: 1.6;
+      resize: vertical;
+    }
+    .editor:focus { outline: none; border-color: var(--brand-color); }
+
+    /* Log viewer */
+    .log-box {
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 12px; line-height: 1.55;
+      max-height: 220px; overflow-y: auto;
+      white-space: pre-wrap; word-break: break-all;
+      color: var(--text-2);
+    }
+    .log-box.tall { max-height: 520px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 24px; right: 24px;
+      padding: 10px 16px; border-radius: 6px;
+      font-size: 13px; box-shadow: var(--shadow);
+      z-index: 9999;
+      animation: slideIn .25s ease;
+    }
+    .toast.success { background: var(--green); color: #fff; }
+    .toast.error { background: var(--red); color: #fff; }
+    .toast.info { background: var(--brand-color); color: #fff; }
+    @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+    /* ───────── Wizard ───────── */
+    .wizard-progress {
+      display: flex; align-items: center;
+      margin-bottom: 18px; padding: 4px 0;
+    }
+    .wizard-step {
+      display: flex; align-items: center; gap: 8px;
+      flex: 1; min-width: 0;
+    }
+    .wizard-step .num {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: var(--surface-2);
+      color: var(--text-3);
+      display: flex; align-items: center; justify-content: center;
+      font-weight: 600; font-size: 13px;
+      flex-shrink: 0;
+      border: 2px solid transparent;
+      transition: all .2s;
+    }
+    .wizard-step.active .num {
+      background: var(--brand-color); color: #fff;
+      border-color: var(--brand-color);
+    }
+    .wizard-step.done .num {
+      background: var(--green); color: #fff;
+      border-color: var(--green);
+    }
+    .wizard-step .lbl { font-size: 13px; color: var(--text-2); }
+    .wizard-step.active .lbl { color: var(--text); font-weight: 600; }
+    .wizard-step.done .lbl { color: var(--green); }
+    .wizard-line {
+      flex: 1; height: 2px; background: var(--border);
+      margin: 0 8px;
+    }
+    .wizard-line.done { background: var(--green); }
+
+    /* Provider grid */
+    .provider-grid {
+      display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px;
+      margin-top: 8px;
+    }
+    @media (max-width: 700px) { .provider-grid { grid-template-columns: 1fr; } }
+    .provider-card {
+      border: 1.5px solid var(--border);
+      background: var(--card-bg);
+      border-radius: var(--radius);
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .provider-card:hover { border-color: var(--brand-color); }
+    .provider-card.selected {
+      border-color: var(--brand-color);
+      background: var(--brand-color-soft);
+    }
+    .provider-card .name { font-weight: 600; font-size: 14px; color: var(--text); }
+    .provider-card .url { font-size: 11px; color: var(--text-3); font-family: monospace; margin-top: 4px; word-break: break-all; }
+    .provider-card .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); margin-top: 6px; }
+
+    /* Theme swatch */
+    .theme-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .theme-swatch {
+      width: 36px; height: 36px; border-radius: 50%;
+      cursor: pointer; border: 2px solid transparent;
+      box-shadow: var(--shadow);
+      transition: transform .15s;
+    }
+    .theme-swatch:hover { transform: scale(1.08); }
+    .theme-swatch.active { border-color: var(--text); }
+    .theme-swatch.blue { background: #2173DF; }
+    .theme-swatch.orange { background: #ff7f16; }
+    .theme-swatch.dark { background: linear-gradient(135deg, #2c3142 0%, #0f1117 100%); position: relative; }
+    .theme-swatch.dark::after {
+      content: '';
+      position: absolute; top: 8px; right: 8px;
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #fbbf24;
+      box-shadow: 0 0 6px rgba(251, 191, 36, 0.6);
+    }
+
+    .hint { font-size: 12px; color: var(--text-3); line-height: 1.55; }
+    .recent-log { max-height: 200px; overflow-y: auto; }
+    a { color: var(--brand-color); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <!-- Mobile menu toggle -->
+  <button class="mobile-menu-btn" id="mobileMenuBtn" onclick="toggleSidebar()" aria-label="菜单">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+  </button>
+  <div class="sidebar-mask" id="sidebarMask" onclick="toggleSidebar(false)"></div>
+
+  <div class="app">
+    <!-- ───────── Sidebar ───────── -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="logo">H</div>
+        <div>
+          <div class="name">Hermes</div>
+          <div class="sub">AI 助手</div>
+        </div>
+      </div>
+      <!-- US-007: 顶部状态指示灯 -->
+      <div class="sidebar-status" title="服务状态：Hermes / Gateway / Dashboard">
+        <span>状态</span>
+        <div class="leds">
+          <span class="led" id="ledHermes" title="Hermes"></span>
+          <span class="led" id="ledGateway" title="Gateway"></span>
+          <span class="led" id="ledDashboard" title="Dashboard"></span>
+        </div>
+      </div>
+      <nav class="nav" id="navList">
+        <div class="nav-item active" data-tab="overview">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          <span class="label">状态总览</span>
+        </div>
+        <div class="nav-item" data-tab="wizard">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 13l4 4L19 7"/></svg>
+          <span class="label">快速向导</span>
+        </div>
+        <div class="nav-item" data-tab="config">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <span class="label">高级配置</span>
+        </div>
+        <div class="nav-item" data-tab="logs">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+          <span class="label">日志</span>
+        </div>
+        <div class="nav-item" data-tab="about">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <span class="label">关于</span>
+        </div>
+      </nav>
+      <div class="footer">
+        <div>Panel <span id="ver-panel">…</span></div>
+        <div>Hermes <span id="ver-hermes">…</span></div>
+      </div>
+    </aside>
+
+    <!-- ───────── Main ───────── -->
+    <main class="main">
+      <div class="main-inner">
+
+        <!-- ── Overview ── -->
+        <section class="pane active" data-pane="overview">
+          <div class="page-head">
+            <h1>状态总览</h1>
+            <div class="sub">实时查看进程与服务状态</div>
+            <div class="spacer"></div>
+            <button class="btn btn-sm" onclick="refreshOverview()">刷新</button>
+          </div>
+
+          <div class="grid-3">
+            <!-- Card: Hermes install -->
+            <div class="card">
+              <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+                Hermes 安装
+              </h3>
+              <div id="hermesStatusBox" class="stack">
+                <div class="muted">检查中…</div>
+              </div>
+            </div>
+            <!-- Card: Gateway -->
+            <div class="card">
+              <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                Gateway
+              </h3>
+              <div id="gatewayStatusBox" class="stack">
+                <div class="muted">检查中…</div>
+              </div>
+              <div class="row" style="margin-top: 12px;">
+                <button class="btn btn-primary btn-sm" id="btnGwStart" onclick="gatewayAction('start')">启动</button>
+                <button class="btn btn-sm" id="btnGwStop" onclick="gatewayAction('stop')">停止</button>
+                <button class="btn btn-sm" id="btnGwRestart" onclick="gatewayAction('restart')">重启</button>
+              </div>
+            </div>
+            <!-- Card: Dashboard -->
+            <div class="card">
+              <h3>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="9" x2="15" y2="9"/><line x1="9" y1="15" x2="13" y2="15"/></svg>
+                Dashboard
+              </h3>
+              <div id="dashboardStatusBox" class="stack">
+                <div class="muted">检查中…</div>
+              </div>
+              <div class="row" style="margin-top: 12px;">
+                <button class="btn btn-primary btn-sm" id="btnDbStart" onclick="dashboardAction('start')">启动</button>
+                <button class="btn btn-sm" id="btnDbStop" onclick="dashboardAction('stop')">停止</button>
+                <button class="btn btn-sm" id="btnDbOpen" onclick="openDashboard()">打开</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              最近日志
+            </h3>
+            <div class="recent-log log-box" id="recentLogBox">加载中…</div>
+          </div>
+
+          <div class="card">
+            <h3>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              快捷入口
+            </h3>
+            <div class="row">
+              <button class="btn btn-primary" onclick="openDashboard()">打开 Dashboard</button>
+              <button class="btn" onclick="switchTab('config')">编辑配置</button>
+              <button class="btn" onclick="switchTab('logs')">查看完整日志</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Wizard ── -->
+        <section class="pane" data-pane="wizard">
+          <div class="page-head">
+            <h1>快速向导</h1>
+            <div class="sub">4 步完成首次配置</div>
+            <div class="spacer"></div>
+            <button class="btn btn-sm btn-ghost" onclick="skipWizard()">跳过向导</button>
+          </div>
+
+          <div class="banner" style="background: var(--surface-2); border-color: var(--border); color: var(--text-2);">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+            <span>本向导只完成最小化配置（安装 + 选 Provider + 启动服务）。<strong>API Key、Token、模型选择</strong>请在第 4 步打开官方 Dashboard 配置。</span>
+          </div>
+
+          <div class="card">
+            <div class="wizard-progress" id="wizardProgress"></div>
+
+            <div class="wiz-step" data-step="1">
+              <h3 style="margin-bottom: 10px;">第 1 步 · 检查 Hermes 安装</h3>
+              <p class="hint" style="margin-bottom: 10px;">本步骤会检查 Python 包 <code>hermes-agent</code> 是否已安装到本地 venv。如未安装，点「一键安装」自动从 PyPI 拉取（需 1-3 分钟）。</p>
+              <div id="wizStep1Body">
+                <div class="muted">检查中…</div>
+              </div>
+            </div>
+
+            <div class="wiz-step" data-step="2" style="display:none;">
+              <h3 style="margin-bottom: 6px;">第 2 步 · 选择 Provider 预设</h3>
+              <p class="hint" style="margin-bottom: 10px;">选一个 LLM 服务商。点选后下方可<strong>修改 Base URL</strong>（OpenAI 兼容/Ollama 等）并<strong>可选填入 API Key</strong>，留空则到 Dashboard 再填。</p>
+              <div class="provider-grid" id="providerGrid"></div>
+              <div id="providerDetail"></div>
+              <div class="row" style="margin-top: 14px;">
+                <button class="btn" onclick="prevWizard()">上一步</button>
+                <div class="spacer"></div>
+                <button class="btn btn-primary" id="btnSaveProvider" onclick="saveProviderAndNext()" disabled>保存并继续</button>
+              </div>
+            </div>
+
+            <div class="wiz-step" data-step="3" style="display:none;">
+              <h3 style="margin-bottom: 10px;">第 3 步 · 启动 Gateway</h3>
+              <p class="hint" style="margin-bottom: 10px;">Gateway 是消息通道服务，负责转发 Telegram/Discord/Slack 等渠道的消息到 Hermes Agent。本机以 systemd 用户进程方式运行，无端口暴露。</p>
+              <div id="wizStep3Body" class="stack">
+                <div class="muted">准备中…</div>
+              </div>
+              <div class="row" style="margin-top: 14px;">
+                <button class="btn" onclick="prevWizard()">上一步</button>
+                <div class="spacer"></div>
+                <button class="btn btn-primary" id="btnStartGw" onclick="wizStartGateway()">启动 Gateway</button>
+                <button class="btn btn-primary" id="btnGwNext" onclick="goWizardStep(4)" style="display:none;">下一步</button>
+              </div>
+            </div>
+
+            <div class="wiz-step" data-step="4" style="display:none;">
+              <h3 style="margin-bottom: 10px;">第 4 步 · 启动 Dashboard</h3>
+              <p class="hint" style="margin-bottom: 10px;">Dashboard 是 Hermes 官方 Web 界面（端口 9119），<strong>在这里填入 OpenAI/OpenRouter 等 API Key、配置 Telegram Bot Token、绑定渠道</strong>。点下方按钮启动后再点「打开 Dashboard」跳转。</p>
+              <div id="wizStep4Body" class="stack">
+                <div class="muted">准备中…</div>
+              </div>
+              <div class="row" style="margin-top: 14px;">
+                <button class="btn" onclick="prevWizard()">上一步</button>
+                <div class="spacer"></div>
+                <button class="btn btn-primary" id="btnStartDb" onclick="wizStartDashboard()">启动 Dashboard</button>
+                <button class="btn btn-primary" id="btnOpenDb" onclick="openDashboard()" style="display:none;">打开 Dashboard</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Config ── -->
+        <section class="pane" data-pane="config">
+          <div class="page-head">
+            <h1>高级配置</h1>
+            <div class="sub">YAML / ENV 手动调整</div>
+          </div>
+
+          <div class="banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>💡 推荐使用官方 Dashboard 配置 Provider 和 Channel，本页适合手动调整边缘参数。</span>
+            <div class="spacer"></div>
+            <button class="btn btn-primary btn-sm" onclick="openDashboard()">打开 Dashboard</button>
+          </div>
+
+          <div class="card">
+            <div class="editor-wrap">
+              <div>
+                <div class="editor-label">config.yaml</div>
+                <textarea class="editor" id="cfgYaml" spellcheck="false" placeholder="# Hermes 主配置..."></textarea>
+              </div>
+              <div>
+                <div class="editor-label">.env</div>
+                <textarea class="editor" id="cfgEnv" spellcheck="false" placeholder="# 环境变量 (KEY=VALUE)" style="min-height: 160px;"></textarea>
+              </div>
+            </div>
+            <div class="row" style="margin-top: 14px;">
+              <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+              <button class="btn" onclick="loadConfig()">重新加载</button>
+              <div class="spacer"></div>
+              <button class="btn btn-ghost" id="btnRestartAfterSave" onclick="gatewayAction('restart')" style="display:none;">重启 Gateway</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Logs ── -->
+        <section class="pane" data-pane="logs">
+          <div class="page-head">
+            <h1>日志</h1>
+            <div class="sub">Gateway 运行日志</div>
+            <div class="spacer"></div>
+            <button class="btn btn-sm" onclick="loadLogs()">刷新</button>
+          </div>
+          <div class="card">
+            <div class="log-box tall" id="fullLogBox">加载中…</div>
+          </div>
+        </section>
+
+        <!-- ── About ── -->
+        <section class="pane" data-pane="about">
+          <div class="page-head">
+            <h1>关于</h1>
+            <div class="sub">版本与主题设置</div>
+          </div>
+          <div class="card">
+            <h3>版本信息</h3>
+            <div class="kv">
+              <div class="k">Panel</div><div class="v" id="aboutPanel">…</div>
+              <div class="k">Hermes</div><div class="v" id="aboutHermes">…</div>
+              <div class="k">Venv</div><div class="v" id="aboutVenv">…</div>
+              <div class="k">数据目录</div><div class="v" id="aboutData">…</div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>主题色</h3>
+            <p class="hint" style="margin-bottom: 10px;">蓝/橙为品牌色，亮暗跟随飞牛系统；第三颗为<strong>强制深色</strong>（手机端飞牛主题不联动 iframe 时手动切换）。</p>
+            <div class="theme-row">
+              <div class="theme-swatch blue active" data-theme="blue" title="OpenClaw 蓝" onclick="setTheme('blue')"></div>
+              <div class="theme-swatch orange" data-theme="orange" title="QwenPaw 橙" onclick="setTheme('orange')"></div>
+              <div class="theme-swatch dark" data-theme="dark" title="强制深色（界面变暗，飞牛主题切换不影响时使用）" onclick="setTheme('dark')"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h3>关于 Hermes</h3>
+            <p class="muted">
+              Hermes 是 Nous Research 开发的自进化 AI Agent 平台。本面板专注进程管理与首次引导，
+              详细 Provider/Channel 配置请使用官方 Dashboard。
+            </p>
+            <div class="kv" style="margin-top: 10px;">
+              <div class="k">Hermes 主页</div>
+              <div class="v"><a href="https://github.com/NousResearch/hermes" target="_blank" rel="noopener" style="color: var(--brand-color);">github.com/NousResearch/hermes</a></div>
+              <div class="k">本应用源码</div>
+              <div class="v"><a href="https://github.com/yaozy2020/com.nousresearch.hermes" target="_blank" rel="noopener" style="color: var(--brand-color);">github.com/yaozy2020/com.nousresearch.hermes</a></div>
+              <div class="k">问题反馈</div>
+              <div class="v"><a href="https://github.com/yaozy2020/com.nousresearch.hermes/issues" target="_blank" rel="noopener" style="color: var(--brand-color);">提交 Issue</a></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <script>
+    // ───────────── API base (fnOS gateway path-aware) ─────────────
+    // 浏览器 URL 可能是 /app/com-nousresearch-hermes（无尾斜杠），此时
+    // window.location.pathname.replace(/[^/]*$/, '') 会得到 '/app/' 把 appname 吃掉。
+    // 所以优先用正则匹配 /app/<appname> 前缀，兜底才用相对目录。
+    var __pn = window.location.pathname;
+    var __m = __pn.match(/^(\/app\/[^\/]+)/);
+    var API_BASE = __m ? (__m[1] + '/') : (__pn.replace(/[^\/]*$/, ''));
+
+    // ───────────── Self-Diagnose (removed in v0.17.3) ─────────────
+
+    // ───────────── State ─────────────
+    var PROVIDERS = [
+      { id: 'openai',       name: 'OpenAI',           base_url: 'https://api.openai.com/v1',         env_key: 'OPENAI_API_KEY',     tag: 'API Key', editable_url: false },
+      { id: 'openrouter',   name: 'OpenRouter',       base_url: 'https://openrouter.ai/api/v1',      env_key: 'OPENROUTER_API_KEY', tag: 'API Key', editable_url: false },
+      { id: 'deepseek',     name: 'DeepSeek',         base_url: 'https://api.deepseek.com/v1',       env_key: 'DEEPSEEK_API_KEY',   tag: 'API Key', editable_url: false },
+      { id: 'anthropic',    name: 'Anthropic',        base_url: 'https://api.anthropic.com',         env_key: 'ANTHROPIC_API_KEY',  tag: 'API Key', editable_url: false },
+      { id: 'opencode',     name: 'OpenCode',         base_url: 'https://opencode.ai/v1',            env_key: 'OPENCODE_API_KEY',   tag: 'API Key', editable_url: true  },
+      { id: 'openai_compat',name: 'OpenAI 兼容',      base_url: 'https://your-endpoint.com/v1',      env_key: 'OPENAI_API_KEY',     tag: '自定义',  editable_url: true  },
+      { id: 'ollama',       name: 'Ollama',           base_url: 'http://localhost:11434/v1',         env_key: '',                   tag: '本地',    editable_url: true  },
+      { id: 'nous',         name: 'Nous Portal',      base_url: 'https://api.nousresearch.com',      env_key: 'NOUS_API_KEY',       tag: 'OAuth',   editable_url: false }
+    ];
+    var WIZARD_STEPS = [
+      { n: 1, label: '安装 Hermes' },
+      { n: 2, label: '选择 Provider' },
+      { n: 3, label: '启动 Gateway' },
+      { n: 4, label: '启动 Dashboard' }
+    ];
+    var wizardCurrent = 1;
+    var wizardDone = { 1: false, 2: false, 3: false, 4: false };
+    var selectedProvider = null;
+    var overviewTimer = null;
+
+    function escapeHtml(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+      });
+    }
+    function api(path, opts) {
+      path = String(path == null ? '' : path).replace(/^\/+/, '');
+      return fetch(API_BASE + path, opts).then(function (r) { return r.json(); });
+    }
+    function toast(msg, type) {
+      type = type || 'info';
+      var el = document.createElement('div');
+      el.className = 'toast ' + type;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(function () { el.remove(); }, 2800);
+    }
+
+    // ───────────── Tab navigation ─────────────
+    function switchTab(name) {
+      document.querySelectorAll('.nav-item').forEach(function (el) {
+        el.classList.toggle('active', el.dataset.tab === name);
+      });
+      document.querySelectorAll('.pane').forEach(function (el) {
+        el.classList.toggle('active', el.dataset.pane === name);
+      });
+      if (overviewTimer) { clearInterval(overviewTimer); overviewTimer = null; }
+      if (name === 'overview') {
+        refreshOverview();
+        overviewTimer = setInterval(refreshOverview, 5000);
+      }
+      if (name === 'wizard') initWizard();
+      if (name === 'config') loadConfig();
+      if (name === 'logs') loadLogs();
+      if (name === 'about') loadVersion();
+      // Mobile: auto-close drawer after selecting
+      if (window.matchMedia('(max-width: 768px)').matches) {
+        toggleSidebar(false);
+      }
+    }
+    document.getElementById('navList').addEventListener('click', function (e) {
+      var item = e.target.closest('.nav-item');
+      if (item) switchTab(item.dataset.tab);
+    });
+
+    // Mobile drawer toggle
+    function toggleSidebar(force) {
+      var sb = document.getElementById('sidebar');
+      var mask = document.getElementById('sidebarMask');
+      var open = (typeof force === 'boolean') ? force : !sb.classList.contains('open');
+      sb.classList.toggle('open', open);
+      mask.classList.toggle('show', open);
+    }
+    // Update sidebar status LEDs (US-007)
+    function updateSidebarLeds(s) {
+      var map = {
+        ledHermes: !!(s && s.hermes_installed),
+        ledGateway: !!(s && s.gateway_running),
+        ledDashboard: !!(s && s.dashboard_running)
+      };
+      Object.keys(map).forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) {
+          el.classList.toggle('on', map[id]);
+          el.classList.toggle('off', !map[id]);
+        }
+      });
+    }
+
+    // ───────────── Overview ─────────────
+    var __sideStatus = { hermes_installed: false, gateway_running: false, dashboard_running: false };
+    function refreshOverview() {
+      api('api/hermes/status').then(function (s) {
+        __sideStatus.hermes_installed = !!s.installed;
+        updateSidebarLeds(__sideStatus);
+        document.getElementById('hermesStatusBox').innerHTML = s.installed
+          ? '<div class="row"><span class="badge running"><span class="dot running"></span>已安装</span></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">路径</div><div class="v">' + escapeHtml(s.bin) + '</div></div>'
+          : '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未安装</span>'
+            + '<button class="btn btn-primary btn-sm" onclick="installHermes()">一键安装</button></div>';
+      }).catch(function () {
+        document.getElementById('hermesStatusBox').innerHTML = '<div class="muted">检查失败</div>';
+      });
+
+      api('api/status').then(function (s) {
+        __sideStatus.gateway_running = !!s.running;
+        updateSidebarLeds(__sideStatus);
+        var html = s.running
+          ? '<div class="row"><span class="badge running"><span class="dot running"></span>运行中</span></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">PID</div><div class="v">' + (s.pid || '-') + '</div></div>'
+          : '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未运行</span></div>';
+        document.getElementById('gatewayStatusBox').innerHTML = html;
+        document.getElementById('btnGwStart').disabled = !!s.running;
+        document.getElementById('btnGwStop').disabled = !s.running;
+        document.getElementById('btnGwRestart').disabled = !s.running;
+        // Update sidebar versions if available
+        if (s.version) {
+          var p = document.getElementById('ver-panel');
+          var h = document.getElementById('ver-hermes');
+          if (p) p.textContent = s.version.panel || '-';
+          if (h) h.textContent = s.version.hermes || '-';
+        }
+      }).catch(function () {
+        document.getElementById('gatewayStatusBox').innerHTML = '<div class="muted">检查失败</div>';
+      });
+
+      api('api/dashboard/status').then(function (s) {
+        __sideStatus.dashboard_running = !!s.running;
+        updateSidebarLeds(__sideStatus);
+        var html = s.running
+          ? '<div class="row"><span class="badge running"><span class="dot running"></span>运行中</span></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">PID</div><div class="v">' + (s.pid || '-') + '</div>'
+            + '<div class="k">端口</div><div class="v">' + (s.port || '-') + '</div></div>'
+          : '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未运行</span></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">端口</div><div class="v">' + (s.port || '-') + '</div></div>';
+        document.getElementById('dashboardStatusBox').innerHTML = html;
+        document.getElementById('btnDbStart').disabled = !!s.running;
+        document.getElementById('btnDbStop').disabled = !s.running;
+      }).catch(function () {
+        document.getElementById('dashboardStatusBox').innerHTML = '<div class="muted">检查失败</div>';
+      });
+
+      api('api/logs?lines=10').then(function (r) {
+        var lines = (r.lines || []).filter(Boolean);
+        document.getElementById('recentLogBox').textContent = lines.length ? lines.join('\n') : '暂无日志';
+      }).catch(function () {
+        document.getElementById('recentLogBox').textContent = '日志读取失败';
+      });
+    }
+
+    function gatewayAction(act) {
+      toast(act === 'start' ? '正在启动…' : act === 'stop' ? '正在停止…' : '正在重启…', 'info');
+      api('api/gateway/' + act, { method: 'POST' }).then(function (r) {
+        if (r.ok) toast('Gateway ' + act + ' 成功', 'success');
+        else toast(r.error || act + ' 失败', 'error');
+      }).catch(function (e) {
+        toast(act + ' 失败: ' + e.message, 'error');
+      }).finally(refreshOverview);
+    }
+    function dashboardAction(act) {
+      toast('Dashboard 正在' + (act === 'start' ? '启动' : '停止') + '…', 'info');
+      api('api/dashboard/' + act, { method: 'POST' }).then(function (r) {
+        if (r.ok) toast('Dashboard ' + act + ' 成功', 'success');
+        else toast(r.error || 'Dashboard ' + act + ' 失败', 'error');
+      }).catch(function (e) {
+        toast('操作失败: ' + e.message, 'error');
+      }).finally(refreshOverview);
+    }
+
+    function openDashboard() {
+      api('api/dashboard/status').then(function (s) {
+        var port = s.port || 9119;
+        var host = window.location.hostname || 'localhost';
+        window.open('http://' + host + ':' + port, '_blank', 'noopener');
+      }).catch(function () {
+        var host = window.location.hostname || 'localhost';
+        window.open('http://' + host + ':9119', '_blank', 'noopener');
+      });
+    }
+
+    function installHermes() {
+      toast('开始安装 Hermes，可能需要 1-3 分钟…', 'info');
+      api('api/hermes/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: 'hermes-agent' })
+      }).then(function (r) {
+        if (r.ok) toast('Hermes 安装完成', 'success');
+        else toast(r.error || '安装失败', 'error');
+      }).catch(function (e) {
+        toast('安装失败: ' + e.message, 'error');
+      }).finally(refreshOverview);
+    }
+
+    // ───────────── Wizard ─────────────
+    function renderWizardProgress() {
+      var el = document.getElementById('wizardProgress');
+      var html = '';
+      WIZARD_STEPS.forEach(function (s, i) {
+        var cls = wizardDone[s.n] ? 'done' : (wizardCurrent === s.n ? 'active' : '');
+        html += '<div class="wizard-step ' + cls + '">'
+          + '<div class="num">' + (wizardDone[s.n] ? '✓' : s.n) + '</div>'
+          + '<div class="lbl">' + s.label + '</div>'
+          + '</div>';
+        if (i < WIZARD_STEPS.length - 1) {
+          html += '<div class="wizard-line ' + (wizardDone[s.n] ? 'done' : '') + '"></div>';
+        }
+      });
+      el.innerHTML = html;
+    }
+    function showWizardStep(n) {
+      document.querySelectorAll('.wiz-step').forEach(function (el) {
+        el.style.display = (parseInt(el.dataset.step) === n) ? '' : 'none';
+      });
+      wizardCurrent = n;
+      renderWizardProgress();
+    }
+    function goWizardStep(n) {
+      showWizardStep(n);
+      if (n === 1) loadStep1();
+      if (n === 2) loadStep2();
+      if (n === 3) loadStep3();
+      if (n === 4) loadStep4();
+    }
+    function prevWizard() { if (wizardCurrent > 1) goWizardStep(wizardCurrent - 1); }
+    function skipWizard() {
+      localStorage.setItem('hermes-wizard-skipped', '1');
+      switchTab('overview');
+      toast('已跳过向导', 'info');
+    }
+
+    function initWizard() {
+      Promise.all([
+        api('api/hermes/status').catch(function () { return { installed: false }; }),
+        api('api/config').catch(function () { return { yaml: '' }; }),
+        api('api/status').catch(function () { return { running: false }; }),
+        api('api/dashboard/status').catch(function () { return { running: false }; })
+      ]).then(function (arr) {
+        wizardDone[1] = !!arr[0].installed;
+        wizardDone[2] = !!(arr[1].yaml && /provider\s*:/i.test(arr[1].yaml));
+        wizardDone[3] = !!arr[2].running;
+        wizardDone[4] = !!arr[3].running;
+        var step = 1;
+        for (var i = 1; i <= 4; i++) {
+          if (!wizardDone[i]) { step = i; break; }
+          if (i === 4) step = 4;
+        }
+        goWizardStep(step);
+      });
+    }
+
+    function loadStep1() {
+      var box = document.getElementById('wizStep1Body');
+      box.innerHTML = '<div class="muted">检查中…</div>';
+      api('api/hermes/status').then(function (s) {
+        if (s.installed) {
+          wizardDone[1] = true;
+          box.innerHTML = '<div class="row"><span class="badge running"><span class="dot running"></span>已安装</span>'
+            + '<button class="btn btn-primary btn-sm" onclick="goWizardStep(2)">下一步</button></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">路径</div><div class="v">' + escapeHtml(s.bin) + '</div></div>';
+        } else {
+          wizardDone[1] = false;
+          box.innerHTML = '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未安装</span></div>'
+            + '<p class="hint" style="margin-top:8px;">点击下方按钮一键安装 hermes-agent (PyPI)。</p>'
+            + '<div class="row" style="margin-top:10px;"><button class="btn btn-primary" onclick="wizInstall()">一键安装</button></div>';
+        }
+        renderWizardProgress();
+      }).catch(function () {
+        box.innerHTML = '<div class="muted">检查失败</div>';
+      });
+    }
+    function wizInstall() {
+      var box = document.getElementById('wizStep1Body');
+      box.innerHTML = '<div class="row"><span class="badge starting"><span class="dot starting"></span>安装中…</span></div>'
+        + '<p class="hint" style="margin-top:8px;">安装可能需要 1-3 分钟，请稍候，过程中可在「日志」页查看进度。</p>';
+      api('api/hermes/install', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: 'hermes-agent' })
+      }).then(function (r) {
+        if (r.ok) toast('安装完成', 'success');
+        else toast(r.error || '安装失败', 'error');
+      }).catch(function (e) {
+        toast('安装失败: ' + e.message, 'error');
+      }).finally(loadStep1);
+    }
+
+    function loadStep2() {
+      var grid = document.getElementById('providerGrid');
+      grid.innerHTML = PROVIDERS.map(function (p) {
+        return '<div class="provider-card" data-id="' + p.id + '" onclick="selectProvider(\'' + p.id + '\')">'
+          + '<div class="name">' + p.name + '</div>'
+          + '<div class="url">' + p.base_url + '</div>'
+          + '<div class="tag">' + p.tag + '</div>'
+          + '</div>';
+      }).join('');
+      selectedProvider = null;
+      document.getElementById('btnSaveProvider').disabled = true;
+      var detail = document.getElementById('providerDetail');
+      if (detail) detail.innerHTML = '';
+    }
+    function selectProvider(id) {
+      selectedProvider = id;
+      document.querySelectorAll('.provider-card').forEach(function (el) {
+        el.classList.toggle('selected', el.dataset.id === id);
+      });
+      document.getElementById('btnSaveProvider').disabled = false;
+      // 渲染下方详情区：可编辑 base_url + 可选 API Key
+      var p = null;
+      for (var i = 0; i < PROVIDERS.length; i++) {
+        if (PROVIDERS[i].id === id) { p = PROVIDERS[i]; break; }
+      }
+      if (!p) return;
+      var detail = document.getElementById('providerDetail');
+      var urlReadonly = p.editable_url ? '' : 'readonly';
+      var urlHint = p.editable_url
+        ? '可修改为你的实际 endpoint（兼容 OpenAI 协议即可）'
+        : '官方默认地址，如需修改请到高级配置';
+      var keyHint = p.env_key
+        ? '可选：现在填好可省得再去 Dashboard 输（写入 .env 的 ' + p.env_key + '）'
+        : '本服务无需 API Key（本地运行）';
+      detail.innerHTML =
+        '<div class="card" style="margin-top:12px; background:var(--surface-2);">'
+        + '<h3 style="margin-bottom:10px;">配置 ' + escapeHtml(p.name) + '</h3>'
+        + '<div class="form-field" style="margin-bottom:12px;">'
+        +   '<label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:4px;">Base URL</label>'
+        +   '<input type="text" id="provBaseUrl" value="' + escapeHtml(p.base_url) + '" ' + urlReadonly + ' '
+        +     'style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card-bg); color:var(--text); font-family:monospace; font-size:13px;" />'
+        +   '<div class="hint" style="margin-top:4px;">' + urlHint + '</div>'
+        + '</div>'
+        + (p.env_key
+          ? '<div class="form-field">'
+            + '<label style="display:block; font-size:12px; color:var(--text-2); margin-bottom:4px;">API Key（可选）</label>'
+            + '<input type="password" id="provApiKey" placeholder="留空则跳过，到 Dashboard 再填" autocomplete="new-password" '
+            +   'style="width:100%; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--card-bg); color:var(--text); font-size:13px;" />'
+            + '<div class="hint" style="margin-top:4px;">' + keyHint + '</div>'
+            + '</div>'
+          : '<div class="hint">' + keyHint + '</div>')
+        + '</div>';
+    }
+    function saveProviderAndNext() {
+      if (!selectedProvider) return;
+      var p = null;
+      for (var i = 0; i < PROVIDERS.length; i++) {
+        if (PROVIDERS[i].id === selectedProvider) { p = PROVIDERS[i]; break; }
+      }
+      if (!p) return;
+      var baseUrlInput = document.getElementById('provBaseUrl');
+      var apiKeyInput = document.getElementById('provApiKey');
+      var baseUrl = (baseUrlInput && baseUrlInput.value.trim()) || p.base_url;
+      var apiKey = (apiKeyInput && apiKeyInput.value.trim()) || '';
+      // OpenAI 兼容模式落库 provider 用 openai
+      var providerId = p.id === 'openai_compat' ? 'openai' : p.id;
+      var yaml = 'model:\n  provider: ' + providerId + '\n  base_url: ' + baseUrl + "\n  default: ''\n";
+      api('api/config').then(function (cur) {
+        var existingEnv = cur.env || '';
+        var newEnv = existingEnv;
+        if (apiKey && p.env_key) {
+          // 已存在同名 env 则替换，否则追加
+          var re = new RegExp('^' + p.env_key + '\\s*=.*$', 'm');
+          var line = p.env_key + '=' + apiKey;
+          if (re.test(newEnv)) {
+            newEnv = newEnv.replace(re, line);
+          } else {
+            if (newEnv && !newEnv.endsWith('\n')) newEnv += '\n';
+            newEnv += line + '\n';
+          }
+        }
+        return api('api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ yaml: yaml, env: newEnv })
+        });
+      }).then(function (r) {
+        if (r.ok) {
+          wizardDone[2] = true;
+          toast(apiKey ? 'Provider + API Key 已保存' : 'Provider 已保存（API Key 待 Dashboard 填）', 'success');
+          goWizardStep(3);
+        } else {
+          toast(r.error || '保存失败', 'error');
+        }
+      }).catch(function (e) {
+        toast('保存失败: ' + e.message, 'error');
+      });
+    }
+
+    function loadStep3() {
+      var box = document.getElementById('wizStep3Body');
+      api('api/status').then(function (s) {
+        if (s.running) {
+          wizardDone[3] = true;
+          box.innerHTML = '<div class="row"><span class="badge running"><span class="dot running"></span>Gateway 运行中</span></div>'
+            + '<div class="kv" style="margin-top:8px;"><div class="k">PID</div><div class="v">' + (s.pid || '-') + '</div></div>';
+          document.getElementById('btnStartGw').style.display = 'none';
+          document.getElementById('btnGwNext').style.display = '';
+        } else {
+          wizardDone[3] = false;
+          box.innerHTML = '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未运行</span></div>'
+            + '<p class="hint" style="margin-top:8px;">点击「启动 Gateway」开始运行 Hermes 主进程。</p>';
+          document.getElementById('btnStartGw').style.display = '';
+          document.getElementById('btnGwNext').style.display = 'none';
+        }
+        renderWizardProgress();
+      });
+    }
+    function wizStartGateway() {
+      var box = document.getElementById('wizStep3Body');
+      box.innerHTML = '<div class="row"><span class="badge starting"><span class="dot starting"></span>启动中…</span></div>';
+      api('api/gateway/start', { method: 'POST' }).then(function (r) {
+        if (r.ok) toast('Gateway 已启动', 'success');
+        else toast(r.error || '启动失败', 'error');
+      }).catch(function (e) {
+        toast('启动失败: ' + e.message, 'error');
+      }).finally(function () {
+        setTimeout(loadStep3, 800);
+      });
+    }
+
+    function loadStep4() {
+      var box = document.getElementById('wizStep4Body');
+      api('api/dashboard/status').then(function (s) {
+        if (s.running) {
+          wizardDone[4] = true;
+          box.innerHTML = '<div class="row"><span class="badge running"><span class="dot running"></span>Dashboard 运行中</span></div>'
+            + '<div class="kv" style="margin-top:8px;">'
+            + '<div class="k">PID</div><div class="v">' + (s.pid || '-') + '</div>'
+            + '<div class="k">端口</div><div class="v">' + (s.port || '-') + '</div></div>'
+            + '<p class="hint" style="margin-top:8px;">🎉 全部就绪！点击「打开 Dashboard」进入官方 GUI 配置 Provider 与 Channel。</p>';
+          document.getElementById('btnStartDb').style.display = 'none';
+          document.getElementById('btnOpenDb').style.display = '';
+        } else {
+          wizardDone[4] = false;
+          box.innerHTML = '<div class="row"><span class="badge stopped"><span class="dot stopped"></span>未运行</span></div>'
+            + '<p class="hint" style="margin-top:8px;">启动 Dashboard 后即可在浏览器里访问官方 GUI（端口 ' + (s.port || 9119) + '）。</p>';
+          document.getElementById('btnStartDb').style.display = '';
+          document.getElementById('btnOpenDb').style.display = 'none';
+        }
+        renderWizardProgress();
+      });
+    }
+    function wizStartDashboard() {
+      var box = document.getElementById('wizStep4Body');
+      box.innerHTML = '<div class="row"><span class="badge starting"><span class="dot starting"></span>启动中…</span></div>';
+      api('api/dashboard/start', { method: 'POST' }).then(function (r) {
+        if (r.ok) toast('Dashboard 已启动', 'success');
+        else toast(r.error || '启动失败', 'error');
+      }).catch(function (e) {
+        toast('启动失败: ' + e.message, 'error');
+      }).finally(function () {
+        setTimeout(loadStep4, 1200);
+      });
+    }
+
+    // ───────────── Config ─────────────
+    function loadConfig() {
+      api('api/config').then(function (c) {
+        document.getElementById('cfgYaml').value = c.yaml || '';
+        document.getElementById('cfgEnv').value = c.env || '';
+      }).catch(function (e) {
+        toast('加载配置失败: ' + e.message, 'error');
+      });
+    }
+    function saveConfig() {
+      var body = {
+        yaml: document.getElementById('cfgYaml').value,
+        env: document.getElementById('cfgEnv').value
+      };
+      api('api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        if (r.ok) {
+          toast('配置已保存，重启 Gateway 生效', 'success');
+          document.getElementById('btnRestartAfterSave').style.display = '';
+        } else {
+          toast(r.error || '保存失败', 'error');
+        }
+      }).catch(function (e) {
+        toast('保存失败: ' + e.message, 'error');
+      });
+    }
+
+    // ───────────── Logs ─────────────
+    function loadLogs() {
+      api('api/logs?lines=300').then(function (r) {
+        var lines = (r.lines || []).filter(Boolean);
+        var box = document.getElementById('fullLogBox');
+        box.textContent = lines.length ? lines.join('\n') : '暂无日志';
+        box.scrollTop = box.scrollHeight;
+      }).catch(function () {
+        document.getElementById('fullLogBox').textContent = '日志读取失败';
+      });
+    }
+
+    // ───────────── About / Version ─────────────
+    function loadVersion() {
+      api('api/version').then(function (v) {
+        document.getElementById('aboutPanel').textContent = v.panel || '-';
+        document.getElementById('aboutHermes').textContent = v.hermes || '-';
+        document.getElementById('aboutVenv').textContent = v.venv || '-';
+        document.getElementById('aboutData').textContent = v.dataDir || '-';
+        document.getElementById('ver-panel').textContent = v.panel || '-';
+        document.getElementById('ver-hermes').textContent = v.hermes || '-';
+      }).catch(function () {});
+    }
+
+    // ───────────── Theme ─────────────
+    // 主题色（品牌色）：blue / orange
+    // 整界面深浅：dark = 强制深色背景（手机端飞牛主题不联动 iframe 时的手动方案）
+    var THEMES = {
+      blue:   { color: '#2173DF', dim: '#1a5cb5', soft: 'rgba(33, 115, 223, 0.12)' },
+      orange: { color: '#ff7f16', dim: '#cc6612', soft: 'rgba(255, 127, 22, 0.14)' },
+      dark:   { color: '#818cf8', dim: '#6366f1', soft: 'rgba(129, 140, 248, 0.16)', forceDark: true }
+    };
+    function setTheme(name) {
+      var t = THEMES[name] || THEMES.blue;
+      document.documentElement.style.setProperty('--brand-color', t.color);
+      document.documentElement.style.setProperty('--brand-color-dim', t.dim);
+      document.documentElement.style.setProperty('--brand-color-soft', t.soft);
+      // 强制深色：在 body 加 data-app-theme=dark 触发深色变量
+      if (t.forceDark) {
+        document.body.setAttribute('data-app-theme', 'dark');
+      } else {
+        document.body.removeAttribute('data-app-theme');
+      }
+      try { localStorage.setItem('hermes-theme', name); } catch (e) {}
+      document.querySelectorAll('.theme-swatch').forEach(function (el) {
+        el.classList.toggle('active', el.dataset.theme === name);
+      });
+    }
+    (function applyInitialTheme() {
+      var saved = 'blue';
+      try { saved = localStorage.getItem('hermes-theme') || 'blue'; } catch (e) {}
+      setTheme(saved);
+    })();
+
+    // ───────────── Boot ─────────────
+    loadVersion();
+    refreshOverview();
+    overviewTimer = setInterval(refreshOverview, 5000);
+
+    // First-run hint: if hermes not installed and not skipped, jump to wizard
+    (function firstRunCheck() {
+      try {
+        if (localStorage.getItem('hermes-wizard-skipped') === '1') return;
+      } catch (e) {}
+      api('api/hermes/status').then(function (s) {
+        if (!s.installed) {
+          switchTab('wizard');
+        }
+      }).catch(function () {});
+    })();
+  </script>
+</body>
+</html>
