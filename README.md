@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.18.4-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.19.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -22,7 +22,7 @@
 - **状态总览** — Hermes / Gateway / Dashboard 三进程实时监控，5 秒自动刷新
 - **侧边栏状态灯** — 顶部 3 颗 LED 实时反映进程运行状态
 - **高级配置** — YAML / ENV 双编辑器，直接编辑 Hermes 配置文件
-- **暗色主题** — 强制深色界面，不依赖飞牛系统主题，手机端可用
+- **主题跟随飞牛系统** — 读取 `localStorage['fnos-theme-mode']` 自动同步亮暗模式，与飞牛桌面视觉统一；亦支持手动强制深色（移动端 fallback）
 - **移动端适配** — 抽屉式侧边栏，3 级断点响应式（1024 / 768 / 380px）
 
 ## 快速开始
@@ -95,7 +95,15 @@ bash build.sh
 
 ## 版本历史
 
-### v0.18.4（当前版本 · 正式版）
+### v0.19.0（当前版本）
+
+- UI 设计系统全面对齐飞牛 Semi Design 色板（grey 系列灰阶 + rgba 透明度边框），视觉与系统原生一致
+- 修复主题跟随机制：采用 OpenClaw 同款方案，读取 `localStorage['fnos-theme-mode']` → `body[theme-mode=dark]`，飞牛系统切换亮暗时自动同步
+- 监听 `storage` 事件实时响应飞牛主题切换
+- 第三颗主题球保留为强制深色 fallback（移动端 iframe localStorage 不可读时使用）
+- 圆角从 8px 调整为 6px 匹配 Semi Design 风格
+
+### v0.18.4（正式版）
 
 - 暗色主题从「暗紫强调色」改为「强制深色界面」，第三颗主题球点击后整面板切换暗色背景，不依赖飞牛系统主题
 - 移除无效的 fnos-theme-mode 监听器（fnOS 无 iframe 主题同步机制）
@@ -137,7 +145,7 @@ Hermes 安装在独立用户目录下的虚拟环境中：`/vol2/@apphome/com.no
 
 ### 亮暗模式不跟随飞牛系统？
 
-fnOS 目前没有向第三方 fpk iframe 传递主题模式的官方机制。请在控制面板「关于」页点击第三颗主题球手动切换暗色。
+v0.19.0 起已修复。控制面板会读取 `localStorage['fnos-theme-mode']` 自动跟随飞牛系统亮暗切换。若在移动端 iframe 中 localStorage 不可读，可点击「关于」页第三颗主题球手动锁定深色模式。
 
 ## 交流与反馈
 
