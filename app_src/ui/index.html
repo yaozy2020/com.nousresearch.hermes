@@ -4,47 +4,66 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Hermes AI 助手</title>
+  <script>
+    // 跟随飞牛系统主题（与 OpenClaw 同款机制）
+    // fnOS 将主题偏好存在 localStorage['fnos-theme-mode']，值为 'dark' 或空
+    (function () {
+      try {
+        var mode = window.localStorage.getItem('fnos-theme-mode') || '';
+        if (mode) document.documentElement.setAttribute('theme-mode', mode);
+      } catch (e) {}
+    })();
+  </script>
   <style>
     :root {
-      /* Brand (default = OpenClaw blue) */
+      /* Brand color (OpenClaw blue = fnOS customized Semi brand) */
       --brand-color: #2173DF;
       --brand-color-dim: #1a5cb5;
-      --brand-color-soft: rgba(33, 115, 223, 0.12);
+      --brand-color-soft: rgba(33, 115, 223, 0.10);
 
-      /* Light theme defaults (will be overridden when fnos-theme-mode=dark) */
-      --bg: #f6f8fb;
-      --card-bg: #ffffff;
-      --surface-2: #f0f3f8;
-      --border: #e3e7ee;
-      --text: #1f2430;
-      --text-2: #5f6675;
-      --text-3: #8a93a3;
+      /* Light theme — aligned with fnOS Semi Design tokens */
+      --bg: #f2f3f4;              /* semi-grey-1 */
+      --card-bg: #ffffff;         /* semi-color-bg-1 */
+      --surface-2: rgba(14,14,15,0.04);   /* semi-fill-0 */
+      --surface-3: rgba(14,14,15,0.06);   /* semi-fill-1 */
+      --border: rgba(14,14,15,0.10);      /* semi-border */
+      --border-strong: rgba(14,14,15,0.16);
+      --text: #0e0e0f;            /* semi-grey-9 */
+      --text-2: rgba(14,14,15,0.65);
+      --text-3: rgba(14,14,15,0.40);
       --green: #16a34a;
-      --green-soft: rgba(22, 163, 74, 0.14);
+      --green-soft: rgba(22, 163, 74, 0.10);
       --red: #dc2626;
-      --red-soft: rgba(220, 38, 38, 0.14);
+      --red-soft: rgba(220, 38, 38, 0.10);
       --yellow: #f59e0b;
-      --yellow-soft: rgba(245, 158, 11, 0.16);
-      --shadow: 0 1px 2px rgba(15, 23, 42, 0.04), 0 4px 12px rgba(15, 23, 42, 0.05);
-      --radius: 8px;
+      --yellow-soft: rgba(245, 158, 11, 0.12);
+      --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.03);
+      --shadow-lg: 0 4px 16px rgba(0,0,0,0.08);
+      --radius: 6px;
+      --radius-sm: 4px;
     }
 
-    body[fnos-theme-mode="dark"], html[fnos-theme-mode="dark"] body,
+    /* Dark theme — fnOS mechanism: body[theme-mode=dark] or html[theme-mode=dark] */
+    /* Also triggered by manual force-dark: body[data-app-theme=dark] */
+    body[theme-mode="dark"], html[theme-mode="dark"] body,
     body[data-app-theme="dark"] {
-      --bg: #0f1117;
-      --card-bg: #1a1d29;
-      --surface-2: #232636;
-      --border: #2c3142;
-      --text: #e6e8ef;
-      --text-2: #aab1c1;
-      --text-3: #6f7689;
+      --bg: #1a1e23;              /* fnOS actual dark bg */
+      --card-bg: #1f2021;         /* semi-grey-1 dark */
+      --surface-2: rgba(248,248,248,0.05);
+      --surface-3: rgba(248,248,248,0.08);
+      --border: rgba(248,248,248,0.10);
+      --border-strong: rgba(248,248,248,0.16);
+      --text: #f8f8f8;            /* semi-grey-9 dark */
+      --text-2: rgba(248,248,248,0.65);
+      --text-3: rgba(248,248,248,0.40);
       --green: #22c55e;
-      --green-soft: rgba(34, 197, 94, 0.18);
+      --green-soft: rgba(34, 197, 94, 0.15);
       --red: #ef4444;
-      --red-soft: rgba(239, 68, 68, 0.18);
+      --red-soft: rgba(239, 68, 68, 0.15);
       --yellow: #fbbf24;
-      --yellow-soft: rgba(251, 191, 36, 0.18);
-      --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.35);
+      --yellow-soft: rgba(251, 191, 36, 0.15);
+      --shadow: 0 1px 3px rgba(0,0,0,0.3), 0 1px 2px rgba(0,0,0,0.2);
+      --shadow-lg: 0 4px 16px rgba(0,0,0,0.4);
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -422,7 +441,7 @@
     .theme-swatch.active { border-color: var(--text); }
     .theme-swatch.blue { background: #2173DF; }
     .theme-swatch.orange { background: #ff7f16; }
-    .theme-swatch.dark { background: linear-gradient(135deg, #2c3142 0%, #0f1117 100%); position: relative; }
+    .theme-swatch.dark { background: linear-gradient(135deg, #1a1e23 0%, #2e2f30 100%); position: relative; }
     .theme-swatch.dark::after {
       content: '';
       position: absolute; top: 8px; right: 8px;
@@ -703,7 +722,7 @@
             <div class="theme-row">
               <div class="theme-swatch blue active" data-theme="blue" title="OpenClaw 蓝" onclick="setTheme('blue')"></div>
               <div class="theme-swatch orange" data-theme="orange" title="QwenPaw 橙" onclick="setTheme('orange')"></div>
-              <div class="theme-swatch dark" data-theme="dark" title="强制深色（界面变暗，飞牛主题切换不影响时使用）" onclick="setTheme('dark')"></div>
+              <div class="theme-swatch dark" data-theme="dark" title="强制深色（不跟随飞牛系统主题，手动锁定深色模式）" onclick="setTheme('dark')"></div>
             </div>
           </div>
           <div class="card">
@@ -1248,34 +1267,65 @@
     }
 
     // ───────────── Theme ─────────────
-    // 主题色（品牌色）：blue / orange
-    // 整界面深浅：dark = 强制深色背景（手机端飞牛主题不联动 iframe 时的手动方案）
+    // 主题色（品牌色）：blue / orange / dark
+    // 亮暗模式：自动跟随飞牛系统（读 localStorage fnos-theme-mode → body[theme-mode]）
+    // dark 主题 = 强制深色（手动覆盖，不受飞牛系统影响）
     var THEMES = {
-      blue:   { color: '#2173DF', dim: '#1a5cb5', soft: 'rgba(33, 115, 223, 0.12)' },
-      orange: { color: '#ff7f16', dim: '#cc6612', soft: 'rgba(255, 127, 22, 0.14)' },
-      dark:   { color: '#818cf8', dim: '#6366f1', soft: 'rgba(129, 140, 248, 0.16)', forceDark: true }
+      blue:   { color: '#2173DF', dim: '#1a5cb5', soft: 'rgba(33, 115, 223, 0.10)', forceDark: false },
+      orange: { color: '#ff7f16', dim: '#cc6612', soft: 'rgba(255, 127, 22, 0.10)', forceDark: false },
+      dark:   { color: '#818cf8', dim: '#6366f1', soft: 'rgba(129, 140, 248, 0.12)', forceDark: true  }
     };
+
+    // 跟随飞牛系统亮暗：读 localStorage fnos-theme-mode 设置 body[theme-mode]
+    // （与 OpenClaw 实现方式一致）
+    function syncFnosTheme() {
+      try {
+        var mode = window.localStorage.getItem('fnos-theme-mode') || '';
+        if (mode) {
+          document.body.setAttribute('theme-mode', mode);
+        } else {
+          document.body.removeAttribute('theme-mode');
+        }
+      } catch (e) {}
+    }
+
     function setTheme(name) {
       var t = THEMES[name] || THEMES.blue;
       document.documentElement.style.setProperty('--brand-color', t.color);
       document.documentElement.style.setProperty('--brand-color-dim', t.dim);
       document.documentElement.style.setProperty('--brand-color-soft', t.soft);
-      // 强制深色：在 body 加 data-app-theme=dark 触发深色变量
+      // dark 主题 = 强制深色（data-app-theme=dark）；其他 = 跟随飞牛系统
       if (t.forceDark) {
         document.body.setAttribute('data-app-theme', 'dark');
       } else {
         document.body.removeAttribute('data-app-theme');
+        syncFnosTheme(); // 恢复跟随飞牛
       }
       try { localStorage.setItem('hermes-theme', name); } catch (e) {}
       document.querySelectorAll('.theme-swatch').forEach(function (el) {
         el.classList.toggle('active', el.dataset.theme === name);
       });
     }
+
+    // 初始化：先跟随飞牛主题，再应用保存的品牌色
+    syncFnosTheme();
     (function applyInitialTheme() {
       var saved = 'blue';
       try { saved = localStorage.getItem('hermes-theme') || 'blue'; } catch (e) {}
       setTheme(saved);
     })();
+
+    // 监听飞牛主题变化（当 fnOS 切换亮暗时，localStorage 会触发 storage 事件）
+    window.addEventListener('storage', function (e) {
+      if (e.key === 'fnos-theme-mode') {
+        // 只在非强制深色模式下跟随
+        var current = 'blue';
+        try { current = localStorage.getItem('hermes-theme') || 'blue'; } catch (err) {}
+        if (!THEMES[current] || !THEMES[current].forceDark) {
+          syncFnosTheme();
+        }
+      }
+    });
 
     // ───────────── Boot ─────────────
     loadVersion();

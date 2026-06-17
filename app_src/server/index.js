@@ -368,7 +368,7 @@ function getVersion() {
       installed = readFileSync(versionFile, "utf-8").trim();
   } catch {}
   return {
-    panel: "0.17.0",
+    panel: "0.19.0",
     hermes: installed,
     venv: VENV_DIR,
     dataDir: DATA_DIR
