@@ -1,44 +1,177 @@
 #!/bin/bash
 
-### uninstall_init — 停止 Hermes 控制面板和 Gateway
+### uninstall_init — 停止 Hermes 控制面板和所有衍生进程
 ### 在卸载真正发生前确保所有进程退出，避免僵尸进程或文件锁
-### 注意：wizard 字段在 callback 阶段才注入，这里只做停服务
+### 注意：wizard 字段在 callback 阶段才注入，这里只做停服务 + 清污染源
 
 LOG_FILE="${TRIM_PKGVAR:-/tmp}/uninstall.log"
 log() { echo "$(date '+%F %T') $*" >> "$LOG_FILE"; }
 
-log "=== uninstall_init start ==="
+log "=== uninstall_init start (v0.21.2) ==="
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 MAIN="${SCRIPT_DIR}/main"
 
-# 1) 走 main stop 通道（会停 bun server + hermes gateway/dashboard）
-if [ -x "$MAIN" ]; then
-    log "Stopping via main script ..."
-    "$MAIN" stop >> "$LOG_FILE" 2>&1 || log "main stop returned non-zero"
-else
-    log "main script not executable: $MAIN"
-fi
-
-# 2) 兜底：杀残留进程（按 socket / venv 路径匹配）
 SOCKET="${TRIM_APPDEST}/com.nousresearch.hermes.sock"
 VENV_PY="${TRIM_PKGHOME}/data/venv/bin/python"
 VENV_HERMES="${TRIM_PKGHOME}/data/venv/bin/hermes"
+TTYD_BIN="${TRIM_APPDEST}/bin/ttyd"
 
-for PATTERN in "$SOCKET" "$VENV_PY" "$VENV_HERMES"; do
-    [ -z "$PATTERN" ] && continue
-    PIDS=$(pgrep -f "$PATTERN" 2>/dev/null || true)
-    if [ -n "$PIDS" ]; then
-        log "killing leftover pids ($PATTERN): $PIDS"
-        kill -TERM $PIDS 2>/dev/null || true
-        sleep 2
-        kill -KILL $PIDS 2>/dev/null || true
+# ---------------------------------------------------------------------------
+# 工具函数
+# ---------------------------------------------------------------------------
+
+# wait_proc_gone PATTERN MAX_SECONDS — 轮询 pgrep，进程完全消失前最多等 N 秒
+wait_proc_gone() {
+    local pat="$1" max="${2:-8}" i=0
+    while [ "$i" -lt "$max" ]; do
+        pgrep -f "$pat" >/dev/null 2>&1 || return 0
+        sleep 1
+        i=$((i + 1))
+    done
+    return 1
+}
+
+# kill_pattern PATTERN — 先 TERM，等不掉再 KILL
+kill_pattern() {
+    local pat="$1"
+    local pids
+    pids=$(pgrep -f "$pat" 2>/dev/null || true)
+    [ -z "$pids" ] && return 0
+    log "  TERM ($pat): $pids"
+    kill -TERM $pids 2>/dev/null || true
+    if wait_proc_gone "$pat" 8; then
+        log "    exited gracefully"
+        return 0
     fi
+    pids=$(pgrep -f "$pat" 2>/dev/null || true)
+    if [ -n "$pids" ]; then
+        log "  KILL ($pat): $pids"
+        kill -KILL $pids 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# disable_systemd_unit OWNER UID UNIT_NAME — 多通道尝试 disable user-level systemd unit
+disable_systemd_unit() {
+    local owner="$1" uid="$2" unit="$3"
+    log "    disabling unit '$unit' for user='$owner' uid=$uid ..."
+    local rc=1
+
+    # root 用户：systemctl --user 默认对应 user@0.service，可以直接调
+    if [ "$uid" = "0" ]; then
+        if systemctl --user disable --now "$unit" >> "$LOG_FILE" 2>&1; then
+            rc=0
+        fi
+    else
+        # 通道 1: machinectl shell（systemd 240+，最干净，会自动起 user@.service）
+        if command -v machinectl >/dev/null 2>&1; then
+            if machinectl shell --uid="$uid" .host /bin/sh -c \
+                "systemctl --user disable --now '$unit' && systemctl --user daemon-reload" \
+                >> "$LOG_FILE" 2>&1; then
+                rc=0
+            fi
+        fi
+        # 通道 2: sudo -u + XDG_RUNTIME_DIR
+        if [ "$rc" != "0" ] && command -v sudo >/dev/null 2>&1; then
+            local rt="/run/user/$uid"
+            if [ -d "$rt" ] && sudo -u "$owner" \
+                XDG_RUNTIME_DIR="$rt" DBUS_SESSION_BUS_ADDRESS="unix:path=$rt/bus" \
+                systemctl --user disable --now "$unit" >> "$LOG_FILE" 2>&1; then
+                rc=0
+            fi
+        fi
+    fi
+
+    if [ "$rc" = "0" ]; then
+        log "      disable OK"
+    else
+        log "      disable failed (will fall back to file removal)"
+    fi
+    return $rc
+}
+
+# ---------------------------------------------------------------------------
+# 1) 走 main stop 通道（停 bun server + hermes gateway/dashboard + ttyd）
+# ---------------------------------------------------------------------------
+if [ -x "$MAIN" ]; then
+    log "Stopping via main script ..."
+    "$MAIN" stop >> "$LOG_FILE" 2>&1 || log "  main stop returned non-zero"
+else
+    log "  main script not executable: $MAIN"
+fi
+
+# ---------------------------------------------------------------------------
+# 2) systemd user unit 主动清理（v0.21.2 加强）
+#
+#   背景：用户若曾在 SSH 里跑过 `hermes gateway setup` 或 `hermes dashboard install`，
+#   hermes-cli 会按调用者身份在 ~/.config/systemd/user/ 装 unit，
+#   结果是卸载本应用后这些 unit 仍在自动复活 hermes 进程。
+#   解决：扫所有 home，先 disable 再删 unit 文件，最后清 wants/requires 软链。
+# ---------------------------------------------------------------------------
+log "Scanning systemd user units ..."
+SYSTEMD_FOUND=0
+SCAN_HOMES=("/root")
+for h in /home/*; do [ -d "$h" ] && SCAN_HOMES+=("$h"); done
+[ -n "${TRIM_PKGHOME:-}" ] && [ -d "$TRIM_PKGHOME" ] && SCAN_HOMES+=("$TRIM_PKGHOME")
+
+for HOMEDIR in "${SCAN_HOMES[@]}"; do
+    UNIT_DIR="${HOMEDIR}/.config/systemd/user"
+    [ -d "$UNIT_DIR" ] || continue
+
+    # 用 find 而非 glob，避免没匹配时拿到字面字符串
+    UNITS=$(find "$UNIT_DIR" -maxdepth 1 -type f \
+        \( -name 'hermes*.service' -o -name 'hermes*.timer' \) 2>/dev/null)
+    [ -z "$UNITS" ] && continue
+
+    while IFS= read -r UNIT; do
+        SYSTEMD_FOUND=1
+        log "  found unit: $UNIT"
+        UNIT_NAME=$(basename "$UNIT")
+        OWNER=$(stat -c '%U' "$UNIT" 2>/dev/null)
+        UID_NUM=$(stat -c '%u' "$UNIT" 2>/dev/null)
+        # 尝试 disable（即使失败也继续删文件）
+        if [ -n "$OWNER" ] && [ -n "$UID_NUM" ]; then
+            disable_systemd_unit "$OWNER" "$UID_NUM" "$UNIT_NAME" || true
+        fi
+        rm -f "$UNIT" 2>/dev/null && log "    file removed"
+        # 清 *.wants / *.requires 软链
+        find "$UNIT_DIR" -maxdepth 2 -name "$UNIT_NAME" -type l -delete 2>/dev/null || true
+    done <<< "$UNITS"
+done
+if [ "$SYSTEMD_FOUND" = "1" ]; then
+    log "  systemd user unit cleanup attempted (see log lines above)"
+else
+    log "  no systemd user unit found"
+fi
+
+# ---------------------------------------------------------------------------
+# 3) 兜底杀残留进程（按 socket / venv 路径 / 关键字匹配，多模式）
+#    顺序：先精确路径（误杀面小），再宽泛关键字
+# ---------------------------------------------------------------------------
+log "Killing leftover processes ..."
+for PATTERN in \
+    "$SOCKET" \
+    "$VENV_PY" \
+    "$VENV_HERMES" \
+    "$TTYD_BIN" \
+    "hermes_cli" \
+    "hermes-gateway" \
+    "hermes-dashboard"
+do
+    [ -z "$PATTERN" ] && continue
+    kill_pattern "$PATTERN"
 done
 
-# 3) 清理 socket / pid 文件（瞬态，不算用户数据）
+# ---------------------------------------------------------------------------
+# 4) 清理瞬态文件（socket / pid / lock）
+#    用户数据 (.hermes/config/venv/...) 不动，由 callback 阶段按 wizard 选择处理
+# ---------------------------------------------------------------------------
+log "Cleaning transient files ..."
 rm -f "${SOCKET}" 2>/dev/null
+rm -f "${TRIM_APPDEST}"/*.sock 2>/dev/null
 rm -f "${TRIM_PKGHOME}/data/runtime/"*.pid 2>/dev/null
+rm -f "${TRIM_PKGHOME}/data/runtime/"*.lock 2>/dev/null
 
 log "=== uninstall_init done ==="
 exit 0

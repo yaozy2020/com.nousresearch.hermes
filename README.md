@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.21.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.21.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -97,7 +97,14 @@ bash build.sh
 
 ## 版本历史
 
-### v0.21.1（当前版本）
+### v0.21.2（当前版本）
+
+- **systemd user unit 主动清理**：`uninstall_init` 扫描 `/root` + `/home/*` + `PKGHOME` 下的 `~/.config/systemd/user/hermes-*.service`，三通道（machinectl / sudo+XDG / 直调）尝试 disable 后再删文件 + 清 wants/requires 软链——解决用户曾在 SSH 跑 `hermes gateway setup` 后无法干净卸载的痛点
+- **进程清理升级**：匹配模式从 3 个扩展到 7 个（新增 ttyd / hermes_cli / hermes-gateway / hermes-dashboard）；TERM 后轮询最多 8 秒等优雅退出再 KILL
+- 新增 `scripts/hermes_uninstall_verify.sh` 真机验证脚本（snapshot → check keep → check wipe，30 分钟完成往返测试）
+- 注：`/vol2/@apphome/<app>/` 4KB 空壳目录由 fnOS 框架管理（独立用户无权删 root 拥有的父目录），不属于残留
+
+### v0.21.1
 
 - 应用商店「安装向导」补全使用声明（3 步）：使用声明 → 推荐使用 CLI 终端初始化 → 确认安装
 - 应用商店「升级向导」新增升级说明，明确不会动 venv / `~/.hermes` / Provider 配置 / API Key
