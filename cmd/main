@@ -18,6 +18,9 @@ SERVER_SCRIPT="${TRIM_APPDEST}/server/index.js"
 # Static frontend files
 STATIC_DIR="${TRIM_APPDEST}/ui"
 
+# ttyd binary dir (v0.20.4)
+HERMES_PANEL_BIN="${TRIM_APPDEST}/bin"
+
 # Unix socket for fnOS gateway
 SOCKET_PATH="${TRIM_APPDEST}/com.nousresearch.hermes.sock"
 
@@ -25,7 +28,7 @@ SOCKET_PATH="${TRIM_APPDEST}/com.nousresearch.hermes.sock"
 HERMES_VENV="${HERMES_DATA_DIR}/venv"
 HERMES_BIN="${HERMES_VENV}/bin/hermes"
 
-CMD="env HERMES_DATA_DIR=\"${HERMES_DATA_DIR}\" STATIC_DIR=\"${STATIC_DIR}\" SOCKET_PATH=\"${SOCKET_PATH}\" HERMES_VENV=\"${HERMES_VENV}\" HERMES_BIN=\"${HERMES_BIN}\" bun \"${SERVER_SCRIPT}\""
+CMD="env HERMES_DATA_DIR=\"${HERMES_DATA_DIR}\" STATIC_DIR=\"${STATIC_DIR}\" SOCKET_PATH=\"${SOCKET_PATH}\" HERMES_VENV=\"${HERMES_VENV}\" HERMES_BIN=\"${HERMES_BIN}\" HERMES_PANEL_BIN=\"${HERMES_PANEL_BIN}\" bun \"${SERVER_SCRIPT}\""
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ${LOG_FILE}
@@ -86,6 +89,16 @@ stop_process() {
         "${HERMES_BIN}" gateway stop >> ${LOG_FILE} 2>&1 || true
         "${HERMES_BIN}" dashboard --stop >> ${LOG_FILE} 2>&1 || true
     fi
+
+    # Also stop ttyd if running (v0.20.4)
+    if [ -r "${HERMES_DATA_DIR}/runtime/ttyd.pid" ]; then
+        ttyd_pid=$(head -n 1 "${HERMES_DATA_DIR}/runtime/ttyd.pid" | tr -d '[:space:]')
+        if [ -n "${ttyd_pid}" ]; then
+            kill -TERM "${ttyd_pid}" 2>/dev/null || true
+            rm -f "${HERMES_DATA_DIR}/runtime/ttyd.pid"
+        fi
+    fi
+    pkill -f "${HERMES_PANEL_BIN}/ttyd" 2>/dev/null || true
 
     rm -f "${SOCKET_PATH}"
     return 0

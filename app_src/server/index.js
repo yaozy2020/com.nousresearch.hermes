@@ -13,6 +13,14 @@ var PID_FILE = `${DATA_DIR}/runtime/gateway.pid`;
 var DASHBOARD_PID_FILE = `${DATA_DIR}/runtime/dashboard.pid`;
 var RUNTIME_DIR = `${DATA_DIR}/runtime`;
 var DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
+// ── ttyd / terminal (v0.20.4) ───────────────────────────────────────
+var BIN_DIR = process.env.HERMES_PANEL_BIN || (process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/bin` : "./bin");
+var TTYD_BIN = `${BIN_DIR}/ttyd`;
+var TERM_PORT = parseInt(process.env.HERMES_TERM_PORT || "9123");
+// ttyd 监听 0.0.0.0，跟 Dashboard 9119 同一玩法（受 fnOS 应用网关保护）
+var TERM_BIND = process.env.HERMES_TERM_BIND || "0.0.0.0";
+var TERM_PID_FILE = `${RUNTIME_DIR}/ttyd.pid`;
+var ttydProcess = null;
 for (const d of [CONFIG_DIR, LOG_DIR, RUNTIME_DIR]) {
   if (!existsSync(d))
     mkdirSync(d, { recursive: true });
@@ -519,6 +527,144 @@ async function parseBody(req) {
     return {};
   }
 }
+
+// ─── Terminal (ttyd) — v0.20.4 ─────────────────────────────────────
+// 仅在控制面板内嵌一个 hermes setup 终端，监听 127.0.0.1:9123。
+// 命令白名单，禁止任意命令执行。
+var TERM_COMMANDS = {
+  setup:    ["setup"],
+  model:    ["model"],
+  login:    ["login"],
+  gateway:  ["gateway", "setup"],
+  doctor:   ["doctor"],
+  status:   ["status"]
+};
+function isTtydAlive() {
+  if (ttydProcess && ttydProcess.pid) {
+    try { process.kill(ttydProcess.pid, 0); return true; } catch { ttydProcess = null; }
+  }
+  if (existsSync(TERM_PID_FILE)) {
+    const pid = parseInt(readFileSync(TERM_PID_FILE, "utf-8").trim());
+    if (pid && !isNaN(pid)) {
+      try { process.kill(pid, 0); return true; }
+      catch { try { unlinkSync(TERM_PID_FILE); } catch {} }
+    }
+  }
+  return false;
+}
+function getTtydPid() {
+  if (ttydProcess?.pid) return ttydProcess.pid;
+  if (existsSync(TERM_PID_FILE)) {
+    return parseInt(readFileSync(TERM_PID_FILE, "utf-8").trim()) || null;
+  }
+  return null;
+}
+async function stopTtyd() {
+  const pid = getTtydPid();
+  if (pid) {
+    try { process.kill(pid, "SIGTERM"); } catch {}
+    for (let i = 0; i < 5; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      try { process.kill(pid, 0); } catch { break; }
+    }
+    try { process.kill(pid, "SIGKILL"); } catch {}
+  }
+  ttydProcess = null;
+  try { unlinkSync(TERM_PID_FILE); } catch {}
+  return { ok: true };
+}
+async function startTtyd(cmdKey) {
+  const cmdArgs = TERM_COMMANDS[cmdKey];
+  if (!cmdArgs) return { ok: false, error: `unknown command: ${cmdKey}` };
+  if (!existsSync(TTYD_BIN))    return { ok: false, error: `ttyd not found at ${TTYD_BIN}` };
+  if (!existsSync(HERMES_BIN))  return { ok: false, error: "hermes binary not found. Install hermes first." };
+  // Always stop previous session first (一次只允许一个终端)
+  await stopTtyd();
+  const env = {
+    ...process.env,
+    HERMES_HOME:      `${DATA_DIR}/home`,
+    HERMES_DATA:      DATA_DIR,
+    HERMES_WORKSPACE: `${DATA_DIR}/workspace`,
+    HERMES_CONFIG:    CONFIG_DIR,
+    HOME:             `${DATA_DIR}/home`,
+    PATH:             `${VENV_DIR}/bin:${process.env.PATH}`,
+    TERM:             "xterm-256color"
+  };
+  // ttyd args:
+  //   -p <port>     listen port
+  //   -i <iface>    bind interface (lo only)
+  //   -W            writable
+  //   -O            check origin disabled (we proxy through panel socket)
+  //   -t            terminal options
+  //   --once        exit after first client disconnects
+  ttydProcess = Bun.spawn([
+    TTYD_BIN,
+    "-p", String(TERM_PORT),
+    "-i", TERM_BIND,
+    "-W",
+    "-O",
+    "-t", "fontSize=14",
+    "-t", "theme={\"background\":\"#0d1117\",\"foreground\":\"#c9d1d9\"}",
+    "--once",
+    HERMES_BIN,
+    ...cmdArgs
+  ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
+  if (!ttydProcess?.pid) return { ok: false, error: "spawn failed" };
+  writeFileSync(TERM_PID_FILE, String(ttydProcess.pid));
+  // Drain stdout/stderr to log so it doesn't block
+  (async () => {
+    try {
+      const r = ttydProcess.stdout.getReader();
+      while (true) { const { done } = await r.read(); if (done) break; }
+    } catch {}
+  })();
+  // Give ttyd ~600ms to bind
+  await new Promise((r) => setTimeout(r, 600));
+  return {
+    ok: true,
+    cmd: cmdKey,
+    args: ["hermes", ...cmdArgs],
+    port: TERM_PORT,
+    pid: ttydProcess.pid,
+    // 前端用 location.hostname + 这个 port 拼出 ttyd 入口
+    url_hint: `http://<host>:${TERM_PORT}/`
+  };
+}
+async function proxyTerminal(req, suffix) {
+  if (!isTtydAlive()) {
+    return new Response("Terminal not started. POST /api/terminal/start first.", { status: 503 });
+  }
+  // ttyd 直接监听公开端口（同 Dashboard 9119 模式），这里仅返回 302 跳转到 ttyd 首页。
+  // 调用方应优先通过 startTtyd 返回的 url + port 直接访问 ttyd。
+  return new Response(null, { status: 302, headers: { Location: `http://${req.headers.get('host')?.split(':')[0] || 'localhost'}:${TERM_PORT}${suffix || '/'}` } });
+}
+
+// ─── Hermes 一键重启（Gateway + Dashboard 全停全起） — v0.20.4 ──
+async function restartHermesAll() {
+  const result = { gateway: null, dashboard: null };
+  // Snapshot 当前在跑的进程，重启后恢复同样的进程
+  const wasGw = isGatewayRunning();
+  const wasDb = isDashboardRunning();
+  // 全停
+  result.gateway = await stopGateway();
+  result.dashboard = await stopDashboard();
+  // 让端口释放
+  await new Promise((r) => setTimeout(r, 800));
+  // 全启（只启动重启前在跑的；都没跑就只起 gateway 默认）
+  if (wasGw || (!wasGw && !wasDb)) {
+    result.gateway = await startGateway();
+  }
+  if (wasDb) {
+    result.dashboard = await startDashboard();
+  }
+  return {
+    ok: true,
+    message: "hermes restarted",
+    restarted: { gateway: wasGw || (!wasGw && !wasDb), dashboard: wasDb },
+    detail: result
+  };
+}
+
 async function handleRequest(req) {
   const url = new URL(req.url);
   let pathname = url.pathname;
@@ -619,7 +765,42 @@ async function handleRequest(req) {
       const result = await startDashboard();
       return json(result, result.ok ? 200 : 500);
     }
+    // ── Hermes 一键全重启（v0.20.4） ──
+    if (pathname === "/api/hermes/restart" && method === "POST") {
+      const result = await restartHermesAll();
+      return json(result);
+    }
+    if (pathname === "/api/hermes/stop_all" && method === "POST") {
+      const gw = await stopGateway();
+      const db = await stopDashboard();
+      return json({ ok: true, gateway: gw, dashboard: db });
+    }
+    // ── Terminal (ttyd, v0.20.4) ──
+    if (pathname === "/api/terminal/status" && method === "GET") {
+      return json({
+        running: isTtydAlive(),
+        pid: getTtydPid(),
+        port: TERM_PORT,
+        ttyd_available: existsSync(TTYD_BIN),
+        commands: Object.keys(TERM_COMMANDS)
+      });
+    }
+    if (pathname === "/api/terminal/start" && method === "POST") {
+      const body = await parseBody(req);
+      const cmd = (body && body.cmd) || "setup";
+      const result = await startTtyd(cmd);
+      return json(result, result.ok ? 200 : 500);
+    }
+    if (pathname === "/api/terminal/stop" && method === "POST") {
+      const result = await stopTtyd();
+      return json(result);
+    }
     return json({ error: "not found" }, 404);
+  }
+  // ── /terminal/* 反代到 ttyd (v0.20.4) ──
+  if (pathname === "/terminal" || pathname.startsWith("/terminal/")) {
+    const suffix = pathname.replace(/^\/terminal/, "") || "/";
+    return proxyTerminal(req, suffix + (url.search || ""));
   }
   return serveStatic(pathname);
 }

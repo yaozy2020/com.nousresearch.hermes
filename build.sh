@@ -17,10 +17,15 @@ echo "[1/5] 准备 build 目录 ..."
 rm -rf "$BUILD_DIR"
 mkdir -p "$BUILD_DIR"
 
-# 2. 打包 app.tgz (server + ui + vendor)
+# 2. 打包 app.tgz (server + ui + bin)
 echo "[2/5] 打包 app.tgz ..."
 cd "$APP_SRC"
-tar czf "$BUILD_DIR/app.tgz" server ui
+# 验证 ttyd 二进制存在
+if [ ! -x "$APP_SRC/bin/ttyd" ]; then
+  echo "ERROR: $APP_SRC/bin/ttyd 不存在或不可执行，无法打包"
+  exit 1
+fi
+tar czf "$BUILD_DIR/app.tgz" server ui bin
 cd "$PROJ_DIR"
 
 # 3. 计算 checksum
