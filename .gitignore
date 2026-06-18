@@ -2,6 +2,9 @@
 build/
 *.fpk
 
+# 备份目录
+.bak_*/
+
 # 临时文件
 *.log
 *.tmp

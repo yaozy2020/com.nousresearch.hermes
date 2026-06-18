@@ -1,2 +1,44 @@
 #!/bin/bash
+
+### uninstall_init — 停止 Hermes 控制面板和 Gateway
+### 在卸载真正发生前确保所有进程退出，避免僵尸进程或文件锁
+### 注意：wizard 字段在 callback 阶段才注入，这里只做停服务
+
+LOG_FILE="${TRIM_PKGVAR:-/tmp}/uninstall.log"
+log() { echo "$(date '+%F %T') $*" >> "$LOG_FILE"; }
+
+log "=== uninstall_init start ==="
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+MAIN="${SCRIPT_DIR}/main"
+
+# 1) 走 main stop 通道（会停 bun server + hermes gateway/dashboard）
+if [ -x "$MAIN" ]; then
+    log "Stopping via main script ..."
+    "$MAIN" stop >> "$LOG_FILE" 2>&1 || log "main stop returned non-zero"
+else
+    log "main script not executable: $MAIN"
+fi
+
+# 2) 兜底：杀残留进程（按 socket / venv 路径匹配）
+SOCKET="${TRIM_APPDEST}/com.nousresearch.hermes.sock"
+VENV_PY="${TRIM_PKGHOME}/data/venv/bin/python"
+VENV_HERMES="${TRIM_PKGHOME}/data/venv/bin/hermes"
+
+for PATTERN in "$SOCKET" "$VENV_PY" "$VENV_HERMES"; do
+    [ -z "$PATTERN" ] && continue
+    PIDS=$(pgrep -f "$PATTERN" 2>/dev/null || true)
+    if [ -n "$PIDS" ]; then
+        log "killing leftover pids ($PATTERN): $PIDS"
+        kill -TERM $PIDS 2>/dev/null || true
+        sleep 2
+        kill -KILL $PIDS 2>/dev/null || true
+    fi
+done
+
+# 3) 清理 socket / pid 文件（瞬态，不算用户数据）
+rm -f "${SOCKET}" 2>/dev/null
+rm -f "${TRIM_PKGHOME}/data/runtime/"*.pid 2>/dev/null
+
+log "=== uninstall_init done ==="
 exit 0

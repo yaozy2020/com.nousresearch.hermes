@@ -146,6 +146,87 @@ function writeConfig(yaml, env) {
     writeFileSync(`${CONFIG_DIR}/.env`, env);
   return { ok: true };
 }
+
+// ─── Channels (.env 字段管理) ───
+// 仅暴露"纯 .env 写入即生效"的频道字段；其他频道引导用户进 Hermes Web UI
+var CHANNEL_FIELDS = {
+  telegram: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USERS", "TELEGRAM_HOME_CHANNEL"],
+  slack:    ["SLACK_BOT_TOKEN", "SLACK_HOME_CHANNEL"],
+  discord:  ["DISCORD_BOT_TOKEN", "DISCORD_HOME_CHANNEL"],
+  qqbot:    ["QQ_APP_ID", "QQBOT_TOKEN", "QQBOT_HOME_CHANNEL"],
+  wecom:    ["WECOM_BOT_ID", "WECOM_HOME_CHANNEL"]
+};
+function parseEnvText(text) {
+  const map = {};
+  if (!text) return map;
+  for (const raw of text.split(/\r?\n/)) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const eq = line.indexOf("=");
+    if (eq < 1) continue;
+    const k = line.slice(0, eq).trim();
+    let v = line.slice(eq + 1).trim();
+    if ((v.startsWith('"') && v.endsWith('"')) || (v.startsWith("'") && v.endsWith("'"))) {
+      v = v.slice(1, -1);
+    }
+    map[k] = v;
+  }
+  return map;
+}
+function serializeEnv(map) {
+  return Object.entries(map)
+    .filter(([_, v]) => v !== undefined && v !== null && v !== "")
+    .map(([k, v]) => `${k}=${v}`)
+    .join("\n") + "\n";
+}
+function readChannels() {
+  const envPath = `${CONFIG_DIR}/.env`;
+  const text = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const env = parseEnvText(text);
+  const out = {};
+  for (const [chan, fields] of Object.entries(CHANNEL_FIELDS)) {
+    out[chan] = {};
+    let configured = false;
+    for (const f of fields) {
+      out[chan][f] = env[f] || "";
+      if (env[f]) configured = true;
+    }
+    out[chan]._configured = configured;
+  }
+  return out;
+}
+function writeChannel(name, values) {
+  if (!CHANNEL_FIELDS[name]) {
+    return { ok: false, error: `unknown channel: ${name}` };
+  }
+  const envPath = `${CONFIG_DIR}/.env`;
+  const text = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const env = parseEnvText(text);
+  const fields = CHANNEL_FIELDS[name];
+  for (const f of fields) {
+    if (Object.prototype.hasOwnProperty.call(values, f)) {
+      const v = values[f];
+      if (v === "" || v === null || v === undefined) {
+        delete env[f];
+      } else {
+        env[f] = String(v);
+      }
+    }
+  }
+  writeFileSync(envPath, serializeEnv(env));
+  return { ok: true, channel: name, configured: fields.some((f) => env[f]) };
+}
+function deleteChannel(name) {
+  if (!CHANNEL_FIELDS[name]) {
+    return { ok: false, error: `unknown channel: ${name}` };
+  }
+  const envPath = `${CONFIG_DIR}/.env`;
+  const text = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const env = parseEnvText(text);
+  for (const f of CHANNEL_FIELDS[name]) delete env[f];
+  writeFileSync(envPath, serializeEnv(env));
+  return { ok: true, channel: name };
+}
 function readLogs(lines = 200) {
   const logFile = `${LOG_DIR}/gateway.log`;
   if (!existsSync(logFile))
@@ -454,6 +535,24 @@ async function handleRequest(req) {
     if (pathname === "/api/logs" && method === "GET") {
       const lines = parseInt(url.searchParams.get("lines") || "200");
       return json(readLogs(lines));
+    }
+    if (pathname === "/api/channels" && method === "GET") {
+      return json({ ok: true, channels: readChannels(), supported: Object.keys(CHANNEL_FIELDS) });
+    }
+    {
+      const m = pathname.match(/^\/api\/channels\/([a-z0-9_-]+)$/);
+      if (m) {
+        const chanName = m[1];
+        if (method === "POST" || method === "PUT") {
+          const body = await parseBody(req);
+          const result = writeChannel(chanName, body || {});
+          return json(result, result.ok ? 200 : 400);
+        }
+        if (method === "DELETE") {
+          const result = deleteChannel(chanName);
+          return json(result, result.ok ? 200 : 400);
+        }
+      }
     }
     if (pathname === "/api/version" && method === "GET") {
       return json(getVersion());

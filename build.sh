@@ -7,7 +7,8 @@ set -e
 PROJ_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_SRC="$PROJ_DIR/app_src"
 BUILD_DIR="$PROJ_DIR/build"
-OUTPUT="$PROJ_DIR/com.nousresearch.hermes.fpk"
+VERSION=$(grep '^version' "$PROJ_DIR/manifest" | awk -F'=' '{print $2}' | tr -d ' ')
+OUTPUT="$PROJ_DIR/com.nousresearch.hermes_v${VERSION}.fpk"
 
 echo "===== Hermes FPK 打包 ====="
 
@@ -19,7 +20,7 @@ mkdir -p "$BUILD_DIR"
 # 2. 打包 app.tgz (server + ui + vendor)
 echo "[2/5] 打包 app.tgz ..."
 cd "$APP_SRC"
-tar czf "$BUILD_DIR/app.tgz" server ui vendor
+tar czf "$BUILD_DIR/app.tgz" server ui
 cd "$PROJ_DIR"
 
 # 3. 计算 checksum

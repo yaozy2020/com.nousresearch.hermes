@@ -429,6 +429,31 @@
     .provider-card .url { font-size: 11px; color: var(--text-3); font-family: monospace; margin-top: 4px; word-break: break-all; }
     .provider-card .tag { display: inline-block; font-size: 10px; padding: 1px 6px; border-radius: 3px; background: var(--surface-2); color: var(--text-2); margin-top: 6px; }
 
+    /* Channel forms */
+    .chan-form {
+      border: 1px solid var(--border);
+      background: var(--surface-2);
+      border-radius: var(--radius);
+      padding: 14px;
+      margin-bottom: 12px;
+    }
+    .chan-form:last-child { margin-bottom: 0; }
+    .chan-head {
+      display: flex; align-items: center; gap: 10px;
+      margin-bottom: 12px;
+    }
+    .chan-name { font-weight: 600; font-size: 15px; color: var(--text); }
+    .chan-badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--surface-3, #2a2a2a); color: var(--text-3); }
+    .chan-badge.ok { background: rgba(64, 187, 90, 0.15); color: #40bb5a; }
+    .chan-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .chan-fields .field-label { font-size: 12px; color: var(--text-2); margin-bottom: 4px; display: block; }
+    .chan-fields input { width: 100%; }
+    .chan-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+    .adv-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+    .adv-card { border: 1px solid var(--border); background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; }
+    .adv-card .adv-name { font-weight: 600; font-size: 13px; color: var(--text); margin-bottom: 4px; }
+    .adv-card .adv-desc { font-size: 12px; color: var(--text-3); line-height: 1.5; }
+
     /* Theme swatch */
     .theme-row { display: flex; gap: 10px; flex-wrap: wrap; }
     .theme-swatch {
@@ -494,6 +519,10 @@
         <div class="nav-item" data-tab="config">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
           <span class="label">高级配置</span>
+        </div>
+        <div class="nav-item" data-tab="channels">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span class="label">消息频道</span>
         </div>
         <div class="nav-item" data-tab="logs">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
@@ -688,6 +717,68 @@
           </div>
         </section>
 
+        <!-- ── Channels ── -->
+        <section class="pane" data-pane="channels">
+          <div class="page-head">
+            <h1>消息频道</h1>
+            <div class="sub">配置 Hermes Gateway 的消息接入渠道</div>
+            <div class="spacer"></div>
+            <button class="btn btn-primary btn-sm" onclick="openDashboard()">打开 Dashboard</button>
+          </div>
+
+          <div class="banner">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span>填写后保存即写入 .env，<strong>需重启 Gateway 生效</strong>。复杂频道（OAuth/外部服务）请打开 Dashboard 配置。</span>
+          </div>
+
+          <!-- 直接配置：纯 .env 即生效 -->
+          <div class="card">
+            <h3 style="margin-bottom: 4px;">🟢 直接配置（重启 Gateway 生效）</h3>
+            <p class="hint" style="margin-bottom: 14px;">填写下方表单 → 保存 → 重启 Gateway → 频道立即可用。</p>
+            <div id="channelForms"></div>
+          </div>
+
+          <!-- 进阶频道：写明依赖，引导打开 Dashboard -->
+          <div class="card">
+            <h3 style="margin-bottom: 4px;">🟡 进阶频道（需配置文件 + 引导）</h3>
+            <p class="hint" style="margin-bottom: 14px;">这些频道需修改 <code>config.yaml</code> 或经过 OAuth/回调，建议打开 Dashboard 配置。</p>
+            <div class="adv-grid">
+              <div class="adv-card">
+                <div class="adv-name">DingTalk 钉钉</div>
+                <div class="adv-desc">需在钉钉开放平台注册应用，配置 OAuth 回调 URL。</div>
+              </div>
+              <div class="adv-card">
+                <div class="adv-name">Feishu 飞书</div>
+                <div class="adv-desc">需企业自建应用 + 事件订阅回调。</div>
+              </div>
+              <div class="adv-card">
+                <div class="adv-name">Email 邮件</div>
+                <div class="adv-desc">SMTP/IMAP 多字段配置。</div>
+              </div>
+              <div class="adv-card">
+                <div class="adv-name">Webhook</div>
+                <div class="adv-desc">需在 <code>config.yaml</code> 定义路由及 HMAC 密钥。</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 外部依赖：仅说明 -->
+          <div class="card">
+            <h3 style="margin-bottom: 4px;">🔴 外部依赖（不可在面板中配置）</h3>
+            <p class="hint" style="margin-bottom: 14px;">需先部署外部服务或申请商业账号，配置完成后请打开 Dashboard 接入。</p>
+            <div class="adv-grid">
+              <div class="adv-card"><div class="adv-name">Signal</div><div class="adv-desc">需 signal-cli-rest-api 容器。</div></div>
+              <div class="adv-card"><div class="adv-name">WhatsApp</div><div class="adv-desc">需 WhatsApp Business 账号。</div></div>
+              <div class="adv-card"><div class="adv-name">BlueBubbles</div><div class="adv-desc">需 macOS 服务器。</div></div>
+              <div class="adv-card"><div class="adv-name">SMS</div><div class="adv-desc">需 Twilio 账号。</div></div>
+              <div class="adv-card"><div class="adv-name">Matrix</div><div class="adv-desc">需 Matrix Homeserver + token。</div></div>
+              <div class="adv-card"><div class="adv-name">Yuanbao 元宝</div><div class="adv-desc">腾讯元宝（需手机号）。</div></div>
+              <div class="adv-card"><div class="adv-name">Weixin 微信公众号</div><div class="adv-desc">需公众号备案。</div></div>
+              <div class="adv-card"><div class="adv-name">WeCom Callback</div><div class="adv-desc">需公网回调 URL。</div></div>
+            </div>
+          </div>
+        </section>
+
         <!-- ── Logs ── -->
         <section class="pane" data-pane="logs">
           <div class="page-head">
@@ -732,6 +823,10 @@
               详细 Provider/Channel 配置请使用官方 Dashboard。
             </p>
             <div class="kv" style="margin-top: 10px;">
+              <div class="k">📖 官方文档</div>
+              <div class="v"><a href="https://hermes-agent.nousresearch.com/docs/" target="_blank" rel="noopener" style="color: var(--brand-color);">hermes-agent.nousresearch.com/docs</a></div>
+              <div class="k">📖 中文社区</div>
+              <div class="v"><a href="https://hermesagent.org.cn/docs/getting-started/installation" target="_blank" rel="noopener" style="color: var(--brand-color);">hermesagent.org.cn/docs</a></div>
               <div class="k">Hermes 主页</div>
               <div class="v"><a href="https://github.com/NousResearch/hermes" target="_blank" rel="noopener" style="color: var(--brand-color);">github.com/NousResearch/hermes</a></div>
               <div class="k">本应用源码</div>
@@ -759,14 +854,16 @@
 
     // ───────────── State ─────────────
     var PROVIDERS = [
-      { id: 'openai',       name: 'OpenAI',           base_url: 'https://api.openai.com/v1',         env_key: 'OPENAI_API_KEY',     tag: 'API Key', editable_url: false },
-      { id: 'openrouter',   name: 'OpenRouter',       base_url: 'https://openrouter.ai/api/v1',      env_key: 'OPENROUTER_API_KEY', tag: 'API Key', editable_url: false },
-      { id: 'deepseek',     name: 'DeepSeek',         base_url: 'https://api.deepseek.com/v1',       env_key: 'DEEPSEEK_API_KEY',   tag: 'API Key', editable_url: false },
-      { id: 'anthropic',    name: 'Anthropic',        base_url: 'https://api.anthropic.com',         env_key: 'ANTHROPIC_API_KEY',  tag: 'API Key', editable_url: false },
-      { id: 'opencode',     name: 'OpenCode',         base_url: 'https://opencode.ai/v1',            env_key: 'OPENCODE_API_KEY',   tag: 'API Key', editable_url: true  },
-      { id: 'openai_compat',name: 'OpenAI 兼容',      base_url: 'https://your-endpoint.com/v1',      env_key: 'OPENAI_API_KEY',     tag: '自定义',  editable_url: true  },
-      { id: 'ollama',       name: 'Ollama',           base_url: 'http://localhost:11434/v1',         env_key: '',                   tag: '本地',    editable_url: true  },
-      { id: 'nous',         name: 'Nous Portal',      base_url: 'https://api.nousresearch.com',      env_key: 'NOUS_API_KEY',       tag: 'OAuth',   editable_url: false }
+      { id: 'openrouter',   name: 'OpenRouter',       base_url: 'https://openrouter.ai/api/v1',      env_key: 'OPENROUTER_API_KEY', tag: '聚合 · 推荐', editable_url: false },
+      { id: 'opencode-zen', name: 'OpenCode Zen',     base_url: 'https://opencode.ai/zen/v1',        env_key: 'OPENCODE_ZEN_API_KEY', tag: '聚合 · 含免费',  editable_url: true  },
+      { id: 'opencode-go',  name: 'OpenCode Go',      base_url: 'https://opencode.ai/go/v1',         env_key: 'OPENCODE_GO_API_KEY',  tag: '订阅',  editable_url: true  },
+      { id: 'deepseek',     name: 'DeepSeek',         base_url: 'https://api.deepseek.com/v1',       env_key: 'DEEPSEEK_API_KEY',   tag: '国内直连', editable_url: false },
+      { id: 'glm',          name: '智谱 GLM',         base_url: 'https://open.bigmodel.cn/api/paas/v4', env_key: 'GLM_API_KEY',     tag: '国内直连', editable_url: false },
+      { id: 'kimi',         name: 'Moonshot Kimi',    base_url: 'https://api.moonshot.cn/v1',        env_key: 'KIMI_API_KEY',       tag: '国内直连', editable_url: false },
+      { id: 'minimax',      name: 'MiniMax',          base_url: 'https://api.minimax.chat/v1',       env_key: 'MINIMAX_API_KEY',    tag: '国内直连', editable_url: false },
+      { id: 'anthropic',    name: 'Anthropic',        base_url: 'https://api.anthropic.com',         env_key: 'ANTHROPIC_API_KEY',  tag: '国际', editable_url: false },
+      { id: 'gemini',       name: 'Google Gemini',    base_url: 'https://generativelanguage.googleapis.com/v1beta', env_key: 'GOOGLE_API_KEY', tag: '国际', editable_url: false },
+      { id: 'openai',       name: 'OpenAI',           base_url: 'https://api.openai.com/v1',         env_key: 'OPENAI_API_KEY',     tag: '国际', editable_url: false }
     ];
     var WIZARD_STEPS = [
       { n: 1, label: '安装 Hermes' },
@@ -812,6 +909,7 @@
       }
       if (name === 'wizard') initWizard();
       if (name === 'config') loadConfig();
+      if (name === 'channels') loadChannels();
       if (name === 'logs') loadLogs();
       if (name === 'about') loadVersion();
       // Mobile: auto-close drawer after selecting
@@ -1239,6 +1337,139 @@
         }
       }).catch(function (e) {
         toast('保存失败: ' + e.message, 'error');
+      });
+    }
+
+    // ───────────── Channels ─────────────
+    var CHANNELS_DEF = [
+      {
+        id: 'telegram',
+        name: 'Telegram',
+        desc: '@BotFather 创建 Bot 获取 token',
+        fields: [
+          { key: 'TELEGRAM_BOT_TOKEN', label: 'Bot Token *', placeholder: '123456:AAxxx...', secret: true, required: true },
+          { key: 'TELEGRAM_ALLOWED_USERS', label: '允许的用户 ID（逗号分隔）', placeholder: '12345678,87654321' },
+          { key: 'TELEGRAM_HOME_CHANNEL', label: '默认频道 / 用户 ID', placeholder: '12345678' }
+        ]
+      },
+      {
+        id: 'slack',
+        name: 'Slack',
+        desc: 'Slack App → OAuth → Bot User OAuth Token',
+        fields: [
+          { key: 'SLACK_BOT_TOKEN', label: 'Bot Token *', placeholder: 'xoxb-...', secret: true, required: true },
+          { key: 'SLACK_HOME_CHANNEL', label: '默认频道 ID', placeholder: 'C0123456789' }
+        ]
+      },
+      {
+        id: 'discord',
+        name: 'Discord',
+        desc: 'Discord Developer Portal → Bot Token',
+        fields: [
+          { key: 'DISCORD_BOT_TOKEN', label: 'Bot Token *', placeholder: 'MTAxxx...', secret: true, required: true },
+          { key: 'DISCORD_HOME_CHANNEL', label: '默认频道 ID', placeholder: '1234567890' }
+        ]
+      },
+      {
+        id: 'qqbot',
+        name: 'QQ 机器人（官方 API）',
+        desc: 'QQ 开放平台 → 机器人管理',
+        fields: [
+          { key: 'QQ_APP_ID', label: 'App ID *', placeholder: '102000xxx', required: true },
+          { key: 'QQBOT_TOKEN', label: 'Token *', placeholder: 'xxxxxxxx', secret: true, required: true },
+          { key: 'QQBOT_HOME_CHANNEL', label: '默认群 ID', placeholder: '12345678' }
+        ]
+      },
+      {
+        id: 'wecom',
+        name: '企业微信（机器人）',
+        desc: '企业微信群 → 添加群机器人 → Webhook URL 中的 key',
+        fields: [
+          { key: 'WECOM_BOT_ID', label: 'Bot Key *', placeholder: 'xxxxxxx-xxxx-xxxx', secret: true, required: true },
+          { key: 'WECOM_HOME_CHANNEL', label: '默认群（可选）', placeholder: 'group_id' }
+        ]
+      }
+    ];
+    function loadChannels() {
+      api('api/channels').then(function (r) {
+        var data = (r && r.channels) || {};
+        var box = document.getElementById('channelForms');
+        if (!box) return;
+        box.innerHTML = CHANNELS_DEF.map(function (c) {
+          var cur = data[c.id] || {};
+          var ok = !!cur._configured;
+          var fields = c.fields.map(function (f) {
+            var v = cur[f.key] || '';
+            var inputType = f.secret ? 'password' : 'text';
+            return ''
+              + '<div>'
+              +   '<label class="field-label" for="ch_' + c.id + '_' + f.key + '">' + escapeHtml(f.label) + '</label>'
+              +   '<input id="ch_' + c.id + '_' + f.key + '" type="' + inputType + '" '
+              +     'placeholder="' + escapeHtml(f.placeholder || '') + '" value="' + escapeHtml(v) + '" autocomplete="off">'
+              + '</div>';
+          }).join('');
+          return ''
+            + '<div class="chan-form" data-chan="' + c.id + '">'
+            +   '<div class="chan-head">'
+            +     '<span class="chan-name">' + escapeHtml(c.name) + '</span>'
+            +     '<span class="chan-badge ' + (ok ? 'ok' : '') + '">' + (ok ? '已配置' : '未配置') + '</span>'
+            +     '<span style="color: var(--text-3); font-size: 12px;">' + escapeHtml(c.desc) + '</span>'
+            +   '</div>'
+            +   '<div class="chan-fields">' + fields + '</div>'
+            +   '<div class="chan-actions">'
+            +     '<button class="btn btn-primary btn-sm" onclick="saveChannel(\'' + c.id + '\')">保存</button>'
+            +     (ok ? '<button class="btn btn-sm btn-ghost" onclick="deleteChannel(\'' + c.id + '\')">清空</button>' : '')
+            +     '<div class="spacer"></div>'
+            +     '<button class="btn btn-sm" onclick="gatewayAction(\'restart\')">重启 Gateway</button>'
+            +   '</div>'
+            + '</div>';
+        }).join('');
+      }).catch(function (e) {
+        toast('加载频道失败: ' + e.message, 'error');
+      });
+    }
+    function saveChannel(id) {
+      var def = CHANNELS_DEF.find(function (c) { return c.id === id; });
+      if (!def) return;
+      var values = {};
+      for (var i = 0; i < def.fields.length; i++) {
+        var f = def.fields[i];
+        var input = document.getElementById('ch_' + id + '_' + f.key);
+        if (!input) continue;
+        var v = input.value.trim();
+        if (f.required && !v) {
+          toast(f.label + ' 不能为空', 'error');
+          input.focus();
+          return;
+        }
+        values[f.key] = v;
+      }
+      api('api/channels/' + id, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(values)
+      }).then(function (r) {
+        if (r.ok) {
+          toast(def.name + ' 已保存，重启 Gateway 生效', 'success');
+          loadChannels();
+        } else {
+          toast(r.error || '保存失败', 'error');
+        }
+      }).catch(function (e) {
+        toast('保存失败: ' + e.message, 'error');
+      });
+    }
+    function deleteChannel(id) {
+      if (!confirm('清空该频道的所有配置？')) return;
+      api('api/channels/' + id, { method: 'DELETE' }).then(function (r) {
+        if (r.ok) {
+          toast('已清空，重启 Gateway 生效', 'success');
+          loadChannels();
+        } else {
+          toast(r.error || '清空失败', 'error');
+        }
+      }).catch(function (e) {
+        toast('清空失败: ' + e.message, 'error');
       });
     }
 
