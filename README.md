@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.20.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.21.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -97,7 +97,15 @@ bash build.sh
 
 ## 版本历史
 
-### v0.20.3（当前版本）
+### v0.21.0（当前版本）
+
+- 新增「CLI 终端」Tab：内置 ttyd 1.7.7 静态二进制（1.3 MB），点按钮自动开新标签页运行 hermes setup / model / login / gateway setup / doctor / status，支持 OAuth 设备授权码、API Key 粘贴、密码隐藏输入
+- 新增「🔄 重启 Hermes」一键按钮：状态总览页右上角，顺序停 Gateway + Dashboard 后整体重启
+- 新增 5 个接口：`/api/terminal/{status,start,stop}` + `/api/hermes/{restart,stop_all}`
+- 命令白名单严格限定 6 条 hermes 子命令，无任意命令执行风险
+- `cmd/main stop` 时自动清理 ttyd 残留进程
+
+### v0.20.3
 
 - 修复版本号穿帮：`/api/version` 改为运行时从 manifest 动态读取面板版本，不再硬编码
 - agent 字段真实化：通过 `hermes --version` 实时探测 venv 内 hermes-agent，未安装时返回 `not_installed`，新增 `agent_installed` 布尔字段
