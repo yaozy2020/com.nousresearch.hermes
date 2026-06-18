@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.20.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.20.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -97,7 +97,14 @@ bash build.sh
 
 ## 版本历史
 
-### v0.20.2（当前版本）
+### v0.20.3（当前版本）
+
+- 修复版本号穿帮：`/api/version` 改为运行时从 manifest 动态读取面板版本，不再硬编码
+- agent 字段真实化：通过 `hermes --version` 实时探测 venv 内 hermes-agent，未安装时返回 `not_installed`，新增 `agent_installed` 布尔字段
+- socket 权限收紧：`com.nousresearch.hermes.sock` 由 0o777 改为 0o660（owner+group only）
+- 文案统一：「Hermes 官方 Web 界面」改为「Hermes 官方控制台」
+
+### v0.20.2
 
 - 「消息频道」页面文案统一：所有「Hermes Web UI / 官方 Web UI」按钮和提示替换为「打开 Dashboard」，与首页用语保持一致
 
