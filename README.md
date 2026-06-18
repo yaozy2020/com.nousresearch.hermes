@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.21.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.21.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -97,7 +97,14 @@ bash build.sh
 
 ## 版本历史
 
-### v0.21.0（当前版本）
+### v0.21.1（当前版本）
+
+- 应用商店「安装向导」补全使用声明（3 步）：使用声明 → 推荐使用 CLI 终端初始化 → 确认安装
+- 应用商店「升级向导」新增升级说明，明确不会动 venv / `~/.hermes` / Provider 配置 / API Key
+- 控制面板「快速向导」顶部新增「使用声明」与「推荐使用 CLI 终端初始化」两块提示 banner
+- 引导用户优先使用内置 CLI 终端运行 hermes setup / model / login / gateway setup 等命令，避免本机 Python 冲突
+
+### v0.21.0
 
 - 新增「CLI 终端」Tab：内置 ttyd 1.7.7 静态二进制（1.3 MB），点按钮自动开新标签页运行 hermes setup / model / login / gateway setup / doctor / status，支持 OAuth 设备授权码、API Key 粘贴、密码隐藏输入
 - 新增「🔄 重启 Hermes」一键按钮：状态总览页右上角，顺序停 Gateway + Dashboard 后整体重启

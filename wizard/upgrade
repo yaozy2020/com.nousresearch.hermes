@@ -1,0 +1,7 @@
+[{
+	"stepTitle": "升级说明",
+	"items": [{
+		"type": "tips",
+		"helpText": "本次升级仅替换控制面板自身（Bun 服务 + UI + ttyd 终端二进制 + cmd 脚本），不会改动以下数据：\n\n• hermes-agent Python venv（保留）\n• ~/.hermes 用户配置目录（保留）\n• Gateway / Dashboard 运行时数据（保留）\n• 已配置的 Provider、Channel、API Key（保留）\n\n升级后控制面板会重启，进行中的 Gateway / Dashboard 进程不会被强制中断，但建议升级后到「状态总览」检查服务运行状态。\n\n如遇异常，可在 GitHub Issues 反馈：https://github.com/yaozy2020/com.nousresearch.hermes/issues"
+	}]
+}]
