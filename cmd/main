@@ -7,7 +7,8 @@ LOG_FILE="${TRIM_PKGVAR}/info.log"
 PID_FILE="${TRIM_PKGVAR}/app.pid"
 
 # Bun / Node path
-export PATH=/var/apps/bunjs/target/bin:/var/apps/nodejs_v24/target/bin:$PATH
+# 优先使用用户家目录下的 bun（v1.3.14 通过官方脚本安装），其次飞牛应用中心 bunjs
+export PATH="$HOME/.bun/bin:/var/apps/bunjs/target/bin:/var/apps/nodejs_v24/target/bin:$PATH"
 
 # Data directory (@apphome)
 HERMES_DATA_DIR="${TRIM_PKGHOME}/data"

@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.21.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.22.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -57,11 +57,26 @@
 ```
 com.nousresearch.hermes/
 ├── app_src/
-│   ├── server/index.js        # Bun HTTP server（Unix socket）
-│   └── ui/
-│       ├── index.html         # 控制面板前端（单文件）
-│       ├── config             # fnOS UI 配置入口
-│       └── images/            # 图标资源
+│   ├── server/
+│   │   ├── index.js           # Bun HTTP server 入口（Unix socket）
+│   │   └── modules/           # 模块化后端：config / hermes / logger / static / terminal / utils / version
+│   ├── ui/                    # 构建后的控制面板前端（由 build.sh 从 ui-vue 同步）
+│   │   ├── index.html
+│   │   ├── config             # fnOS UI 配置入口
+│   │   └── public/            # JS/CSS/字体构建产物
+│   └── ui-vue/                # Vue 3 + Nuxt UI v4 + TailwindCSS v4 源码工程
+│       ├── src/
+│       │   ├── assets/        # 全局样式
+│       │   ├── components/    # DesktopSidebar / MobileTabBar / ResponsiveLayout
+│       │   ├── composables/   # useApi / useTheme
+│       │   ├── config/        # 导航配置
+│       │   ├── pages/         # 状态总览 / 快速向导 / 终端 / 配置 / 频道 / 日志 / 关于
+│       │   └── types/         # 前后端共享 API 类型副本
+│       ├── public/icons/      # Hermes Agent 品牌 SVG 图标
+│       ├── package.json       # Bun 工具链
+│       └── vite.config.ts
+├── shared/
+│   └── api-types.ts           # 前后端共享 API 类型定义
 ├── cmd/
 │   ├── main                   # 主程序入口（启动/停止/状态管理）
 │   ├── install_callback       # 安装后回调（创建目录结构）
@@ -84,20 +99,27 @@ com.nousresearch.hermes/
 ## 构建
 
 ```bash
-# 1. 编译 server
-cd app_src
-/var/apps/bunjs/target/bin/bun build ./server/index.js --outdir ./server --target=bun
-
-# 2. 打包 fpk
-cd ..
+# 一键打包（自动安装 Bun 前端依赖、构建 Vue 工程、同步到 app_src/ui、生成 fpk）
 bash build.sh
 
-# 输出: com.nousresearch.hermes_v<VERSION>.fpk（~460KB）
+# 输出: com.nousresearch.hermes_v<VERSION>.fpk（约 950KB）
 ```
+
+`build.sh` 会安全地处理 `app_src/ui` 目录：保留 `config` 等运行时文件，只替换前端构建产物，避免误删用户配置。
 
 ## 版本历史
 
-### v0.21.2（当前版本）
+### v0.22.0（当前版本）
+
+- **前端 UI 全面重构**：基于 Vue 3 + Nuxt UI v4 + TailwindCSS v4 重写控制面板，复用 QwenPaw 控制台设计语言，视觉与 fnOS 系统更统一
+- **工程化治理**：后端 `server/index.js` 按职责拆分为 `modules/{config,hermes,logger,static,terminal,utils,version}.js`；新增 `shared/api-types.ts` 统一前后端类型
+- **构建工具链统一为 Bun**：`app_src/ui-vue/` 使用 Bun 安装依赖并构建，产物通过 `build.sh` 安全同步到 `app_src/ui`，避免误删 `config` 等运行时文件
+- **状态总览接口增强**：`/api/health` 聚合 Hermes 安装、venv、二进制、Gateway/Dashboard 运行状态与 PID/端口，前端从 4 个并发请求减为 2 个
+- **侧边栏品牌升级**：顶部改为官方 Hermes Agent 文字 SVG 图标，颜色随主题主色变化；移除旧侧脸剪影图标及 H 字母临时方案
+- **应用图标更新**：`ICON.PNG` / `ICON_256.PNG` 替换为不透明白底 H 艺术字图标，符合 FNOS 应用中心要求
+- **构建产物瘦身**：fpk 从约 1.4MB 降至约 950KB
+
+### v0.21.2
 
 - **systemd user unit 主动清理**：`uninstall_init` 扫描 `/root` + `/home/*` + `PKGHOME` 下的 `~/.config/systemd/user/hermes-*.service`，三通道（machinectl / sudo+XDG / 直调）尝试 disable 后再删文件 + 清 wants/requires 软链——解决用户曾在 SSH 跑 `hermes gateway setup` 后无法干净卸载的痛点
 - **进程清理升级**：匹配模式从 3 个扩展到 7 个（新增 ttyd / hermes_cli / hermes-gateway / hermes-dashboard）；TERM 后轮询最多 8 秒等优雅退出再 KILL

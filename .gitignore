@@ -2,6 +2,16 @@
 build/
 *.fpk
 
+# 前端构建产物（由 build.sh 从 ui-vue/dist 同步生成）
+app_src/ui/index.html
+app_src/ui/public/
+app_src/ui/icons/
+app_src/ui-vue/dist/
+app_src/ui-vue/node_modules/
+app_src/ui-vue/auto-imports.d.ts
+app_src/ui-vue/components.d.ts
+app_src/ui-vue/bun.lock
+
 # 备份目录
 .bak_*/
 

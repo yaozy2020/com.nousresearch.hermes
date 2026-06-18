@@ -1,0 +1,305 @@
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { api } from '@/composables/useApi'
+import type { HealthResponse, LogResponse } from '@/types/api'
+
+interface HermesStatus {
+  installed: boolean
+  bin?: string
+}
+
+interface GatewayStatus {
+  running: boolean
+  pid?: number
+  version?: { panel?: string; hermes?: string }
+}
+
+interface DashboardStatus {
+  running: boolean
+  pid?: number
+  port?: number
+}
+
+const toast = useToast()
+
+function showNotification(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
+  const color = type === 'error' ? 'error' : type === 'warning' ? 'warning' : type === 'success' ? 'success' : 'neutral'
+  const icon = type === 'error' ? 'i-lucide-x-circle' : type === 'warning' ? 'i-lucide-alert-triangle' : type === 'success' ? 'i-lucide-check-circle' : 'i-lucide-info'
+  toast.add({ title: message, color, icon })
+}
+
+const hermes = ref<HermesStatus | null>(null)
+const gateway = ref<GatewayStatus | null>(null)
+const dashboard = ref<DashboardStatus | null>(null)
+const recentLogs = ref<string>('')
+const loading = ref(false)
+const timer = ref<number | null>(null)
+
+const panelVersion = computed(() => gateway.value?.version?.panel || '-')
+const hermesVersion = computed(() => gateway.value?.version?.hermes || '-')
+
+async function refreshOverview(notify = false) {
+  loading.value = true
+  try {
+    const [health, l] = await Promise.all([
+      api<HealthResponse>('api/health').catch(() => null),
+      api<LogResponse>('api/logs?lines=10').catch(() => ({ lines: [] })),
+    ])
+    if (!health) {
+      hermes.value = { installed: false }
+      gateway.value = { running: false }
+      dashboard.value = { running: false }
+      if (notify) showNotification('无法获取运行状态', 'error')
+      return
+    }
+    hermes.value = { installed: health.hermesInstalled, bin: health.bin }
+    gateway.value = { running: health.gatewayRunning, pid: health.gatewayPid ?? undefined, version: health.version }
+    dashboard.value = { running: health.dashboardRunning, pid: health.dashboardPid ?? undefined, port: health.dashboardPort }
+    const lines = l.lines || []
+    recentLogs.value = lines.length ? lines.join('\n') : '暂无日志'
+    if (notify) showNotification('状态已刷新', 'success')
+  } catch (e: unknown) {
+    const err = e as Error
+    if (notify) showNotification('刷新失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    loading.value = false
+  }
+}
+
+async function gatewayAction(act: 'start' | 'stop' | 'restart') {
+  const label = act === 'start' ? '启动' : act === 'stop' ? '停止' : '重启'
+  showNotification(`Gateway 正在${label}…`, 'info')
+  try {
+    const r = await api<{ ok: boolean; error?: string }>(`api/gateway/${act}`, { method: 'POST' })
+    if (r.ok) showNotification(`Gateway ${label} 成功`, 'success')
+    else showNotification(r.error || `${label} 失败`, 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification(`${label} 失败: ${err?.message ?? String(e)}`, 'error')
+  } finally {
+    refreshOverview()
+  }
+}
+
+async function dashboardAction(act: 'start' | 'stop') {
+  const label = act === 'start' ? '启动' : '停止'
+  showNotification(`Dashboard 正在${label}…`, 'info')
+  try {
+    const r = await api<{ ok: boolean; error?: string }>(`api/dashboard/${act}`, { method: 'POST' })
+    if (r.ok) showNotification(`Dashboard ${label} 成功`, 'success')
+    else showNotification(r.error || `Dashboard ${label} 失败`, 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification(`操作失败: ${err?.message ?? String(e)}`, 'error')
+  } finally {
+    refreshOverview()
+  }
+}
+
+async function installHermes() {
+  showNotification('开始安装 Hermes，可能需要 1-3 分钟…', 'info')
+  try {
+    const r = await api<{ ok: boolean; error?: string }>('api/hermes/install', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ package: 'hermes-agent' }),
+    })
+    if (r.ok) showNotification('Hermes 安装完成', 'success')
+    else showNotification(r.error || '安装失败', 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('安装失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    refreshOverview()
+  }
+}
+
+async function hermesRestartAll() {
+  const ok = confirm('将停止 Gateway 与 Dashboard 后整体重启，需要约 3-8 秒。继续？')
+  if (!ok) return
+  showNotification('正在重启 Hermes…', 'info')
+  try {
+    const r = await api<{ ok: boolean; error?: string }>('api/hermes/restart', { method: 'POST' })
+    if (r.ok) showNotification('Hermes 重启完成', 'success')
+    else showNotification('重启失败: ' + (r.error || '未知错误'), 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('重启失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    setTimeout(() => refreshOverview(), 1200)
+  }
+}
+
+async function openDashboard() {
+  try {
+    const s = await api<DashboardStatus>('api/dashboard/status')
+    const port = s.port || 9119
+    const host = window.location.hostname || 'localhost'
+    window.open(`http://${host}:${port}`, '_blank', 'noopener')
+  } catch {
+    const host = window.location.hostname || 'localhost'
+    window.open(`http://${host}:9119`, '_blank', 'noopener')
+  }
+}
+
+onMounted(() => {
+  refreshOverview()
+  timer.value = window.setInterval(() => refreshOverview(), 5000)
+})
+
+onUnmounted(() => {
+  if (timer.value) window.clearInterval(timer.value)
+})
+</script>
+
+<template>
+  <div class="mx-auto space-y-6">
+    <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+      <div>
+        <h1 class="text-3xl font-bold text-[var(--ui-text)]">
+          状态总览
+        </h1>
+        <p class="text-[var(--ui-text-muted)] mt-2">
+          实时查看 Hermes 安装、Gateway 与 Dashboard 进程状态
+        </p>
+      </div>
+      <div class="flex flex-wrap items-center gap-2">
+        <UButton
+          color="error"
+          variant="solid"
+          icon="i-lucide-rotate-ccw"
+          :loading="loading"
+          @click="hermesRestartAll"
+        >
+          重启 Hermes
+        </UButton>
+        <UButton
+          color="neutral"
+          variant="outline"
+          icon="i-lucide-refresh-cw"
+          :loading="loading"
+          @click="refreshOverview(true)"
+        >
+          刷新
+        </UButton>
+      </div>
+    </div>
+
+    <!-- 状态卡片 -->
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-layers" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">Hermes 安装</span>
+          </div>
+        </template>
+        <div class="space-y-3">
+          <div v-if="hermes" class="flex items-center gap-3">
+            <UBadge :color="hermes.installed ? 'success' : 'neutral'" variant="soft" size="md">
+              <template #leading>
+                <UIcon :name="hermes.installed ? 'i-lucide-check-circle' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+              </template>
+              {{ hermes.installed ? '已安装' : '未安装' }}
+            </UBadge>
+            <UButton v-if="!hermes.installed" color="primary" size="sm" @click="installHermes">
+              一键安装
+            </UButton>
+          </div>
+          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
+          <div v-if="hermes?.installed && hermes.bin" class="text-xs text-[var(--ui-text-muted)]">
+            路径：<span class="font-mono text-[var(--ui-text)]">{{ hermes.bin }}</span>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-zap" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">Gateway</span>
+          </div>
+        </template>
+        <div class="space-y-3">
+          <div v-if="gateway" class="flex items-center gap-3">
+            <UBadge :color="gateway.running ? 'success' : 'neutral'" variant="soft" size="md">
+              <template #leading>
+                <UIcon :name="gateway.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+              </template>
+              {{ gateway.running ? '运行中' : '未运行' }}
+            </UBadge>
+            <span v-if="gateway.running" class="text-xs text-[var(--ui-text-muted)]">
+              PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
+            </span>
+          </div>
+          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
+          <div class="flex flex-wrap gap-2">
+            <UButton color="primary" size="sm" :disabled="gateway?.running" @click="gatewayAction('start')">启动</UButton>
+            <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('stop')">停止</UButton>
+            <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('restart')">重启</UButton>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-layout-template" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">Dashboard</span>
+          </div>
+        </template>
+        <div class="space-y-3">
+          <div v-if="dashboard" class="flex items-center gap-3">
+            <UBadge :color="dashboard.running ? 'success' : 'neutral'" variant="soft" size="md">
+              <template #leading>
+                <UIcon :name="dashboard.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+              </template>
+              {{ dashboard.running ? '运行中' : '未运行' }}
+            </UBadge>
+            <span v-if="dashboard.running" class="text-xs text-[var(--ui-text-muted)]">
+              PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
+            </span>
+          </div>
+          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
+          <div class="flex flex-wrap gap-2">
+            <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
+            <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
+            <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
+          </div>
+        </div>
+      </UCard>
+    </div>
+
+    <!-- 版本与日志 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm lg:col-span-1" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-info" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">版本信息</span>
+          </div>
+        </template>
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-[var(--ui-text-muted)]">Panel</span>
+            <span class="font-mono text-[var(--ui-text)]">{{ panelVersion }}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-[var(--ui-text-muted)]">Hermes</span>
+            <span class="font-mono text-[var(--ui-text)]">{{ hermesVersion }}</span>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm lg:col-span-2" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-file-text" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">最近日志</span>
+          </div>
+        </template>
+        <pre class="bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg p-3 text-xs font-mono text-[var(--ui-text-muted)] whitespace-pre-wrap break-all max-h-[220px] overflow-y-auto">{{ recentLogs }}</pre>
+      </UCard>
+    </div>
+  </div>
+</template>
