@@ -441,16 +441,44 @@ async function installHermes(packageSpec) {
     return { ok: false, error: e.message };
   }
 }
-function getVersion() {
-  const versionFile = `${CONFIG_DIR}/../install/version.txt`;
-  let installed = "unknown";
+// ─── Panel version: 运行时从 manifest 读取，避免硬编码穿帮 ───
+function readPanelVersion() {
+  const candidates = [
+    process.env.MANIFEST_PATH,
+    process.env.TRIM_APPDEST ? join(process.env.TRIM_APPDEST, "..", "manifest") : null,
+    "/var/apps/com.nousresearch.hermes/manifest"
+  ].filter(Boolean);
+  for (const p of candidates) {
+    try {
+      const txt = readFileSync(p, "utf-8");
+      const m = txt.match(/^\s*version\s*=\s*(\S+)/m);
+      if (m) return m[1];
+    } catch {}
+  }
+  return "unknown";
+}
+const PANEL_VERSION = readPanelVersion();
+
+// ─── Agent version: 真实从 venv 读，没装就显示 not_installed ───
+function readAgentVersion() {
+  if (!existsSync(HERMES_BIN)) return null;
   try {
-    if (existsSync(versionFile))
-      installed = readFileSync(versionFile, "utf-8").trim();
+    const proc = Bun.spawnSync([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
+    const out = (proc.stdout?.toString() || "") + (proc.stderr?.toString() || "");
+    const m = out.match(/(\d+\.\d+\.\d+[\w.-]*)/);
+    if (m) return m[1];
   } catch {}
+  return "unknown";
+}
+
+function getVersion() {
+  const agentVer = readAgentVersion();
   return {
-    panel: "0.19.0",
-    hermes: installed,
+    panel: PANEL_VERSION,
+    agent: agentVer === null ? "not_installed" : agentVer,
+    agent_installed: agentVer !== null,
+    // 兼容旧字段（前端可能在用）
+    hermes: agentVer === null ? "not_installed" : agentVer,
     venv: VENV_DIR,
     dataDir: DATA_DIR
   };
@@ -620,7 +648,7 @@ var server = Bun.serve({
   }
 });
 try {
-  chmodSync(SOCKET_PATH, 511);
+  chmodSync(SOCKET_PATH, 0o660);
 } catch {}
 console.log(`[Hermes Panel] Listening on socket: ${SOCKET_PATH}`);
 console.log(`[Hermes Panel] Static dir: ${STATIC_DIR}`);
