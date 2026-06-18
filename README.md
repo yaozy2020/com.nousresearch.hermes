@@ -16,15 +16,15 @@
 
 ## 核心功能
 
-- **轻量控制面板** — Bun + Unix socket + fnOS gatewaySocket，无 Docker 依赖，单文件前端
+- **现代控制面板** — Bun + Unix socket + fnOS gatewaySocket，无 Docker 依赖；前端基于 Vue 3 + Nuxt UI v4 + TailwindCSS v4 工程化构建，复用 QwenPaw 设计语言
 - **4 步快速向导** — 检查 Hermes 安装 → 选择 Provider 预设 → 启动 Gateway → 启动 Dashboard
 - **多 Provider 预设** — OpenRouter / OpenCode-Zen / OpenCode-Go / DeepSeek / GLM / Kimi / MiniMax / Anthropic / Gemini / OpenAI，选中后可修改 Base URL 并选填 API Key
 - **消息频道管理** — 内置 Telegram / Slack / Discord / QQBot / 企业微信 5 个绿色频道直接表单配置（写 .env，重启 Gateway 立即生效），进阶/外部依赖频道引导跳转 Dashboard
-- **状态总览** — Hermes / Gateway / Dashboard 三进程实时监控，5 秒自动刷新
-- **侧边栏状态灯** — 顶部 3 颗 LED 实时反映进程运行状态
+- **状态总览** — Hermes / Gateway / Dashboard / CLI 终端 多进程实时监控，5 秒自动刷新
+- **CLI 终端** — 内置 ttyd 浏览器终端，一键运行 `hermes setup / model / login / gateway setup / doctor / status`
 - **高级配置** — YAML / ENV 双编辑器，直接编辑 Hermes 配置文件
-- **主题跟随飞牛系统** — 读取 `localStorage['fnos-theme-mode']` 自动同步亮暗模式，与飞牛桌面视觉统一；亦支持手动强制深色（移动端 fallback）
-- **移动端适配** — 抽屉式侧边栏，3 级断点响应式（1024 / 768 / 380px）
+- **主题跟随飞牛系统** — 读取飞牛桌面写入的 `DesktopConfig-1000` localStorage 配置，自动同步亮暗模式与系统视觉统一；支持 6 种主题色（天空蓝 / 落日橙 / 星云紫 / 极光青 / 玫瑰红 / 系统默认）
+- **响应式布局** — 桌面端侧边栏导航 + 移动端底部 Tab 栏，自动适配 1024 / 768 / 380px 断点
 
 ## 快速开始
 
@@ -216,7 +216,7 @@ v0.20.1 起卸载向导完整支持「保留 / 清除」两种模式：
 
 ### 亮暗模式不跟随飞牛系统？
 
-v0.19.0 起已修复。控制面板会读取 `localStorage['fnos-theme-mode']` 自动跟随飞牛系统亮暗切换。若在移动端 iframe 中 localStorage 不可读，可点击「关于」页第三颗主题球手动锁定深色模式。
+v0.22.0 起控制面板读取飞牛桌面写入的 `DesktopConfig-1000` localStorage 配置自动同步亮暗模式。若切换飞牛系统主题后控制面板未立即变化，请刷新浏览器页面。
 
 ## 交流与反馈
 
