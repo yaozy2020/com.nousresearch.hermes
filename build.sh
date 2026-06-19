@@ -47,11 +47,11 @@ else
 fi
 
 # 生产构建使用 fnOS 网关绝对路径，避免无尾斜杠访问时相对路径解析错误
-VITE_BASE_PATH="/app/com-nousresearch-hermes/"
+export VITE_BASE_PATH="/app/com-nousresearch-hermes/"
 if [ "$PKG_MANAGER" = "bun" ]; then
-  BUILD_CMD="VITE_BASE_PATH=\"$VITE_BASE_PATH\" bun ./node_modules/vite/bin/vite.js build"
+  BUILD_CMD="bun ./node_modules/vite/bin/vite.js build"
 else
-  BUILD_CMD="VITE_BASE_PATH=\"$VITE_BASE_PATH\" $RUN_CMD vite build"
+  BUILD_CMD="$RUN_CMD vite build"
 fi
 
 cd "$APP_SRC/ui-vue"
