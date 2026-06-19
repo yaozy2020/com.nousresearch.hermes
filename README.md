@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.0)
+[![Version](https://img.shields.io/badge/version-0.26.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,11 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.0（当前版本）
+### v0.26.1（当前版本）
+
+卸载向导默认值修正：保留配置 / 保留运行环境开关默认不勾选，避免点击卸载后仍残留 venv 与配置。
+
+### v0.26.0
 
 治理系列最终合并版：合并 v0.25.4 ~ v0.25.8 全部安全加固与工程质量改进，包含终端沙箱、CSRF 收紧、安装包来源限制、敏感文件 0o640/0o750 权限、日志按天轮转、前后端 API 类型检查、统一错误处理、非法 JSON 400、静态目录 404、Dashboard 一键锁本地、频道页 v-model 校验等。
 
