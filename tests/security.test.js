@@ -64,6 +64,23 @@ describe("security / CSRF", () => {
     assert.strictEqual(isSafeWriteRequest(req), true);
   });
 
+  it("allows private IP origin even when req Host is internal socket name", () => {
+    const req = {
+      method: "POST",
+      url: "http://com.nousresearch.hermes/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "com.nousresearch.hermes",
+            origin: "http://192.168.10.236"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), true);
+  });
+
   it("prefers Host header over req.url when checking origin", () => {
     const req = {
       method: "POST",

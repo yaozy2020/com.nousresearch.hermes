@@ -271,9 +271,8 @@ onUnmounted(() => {
         <template #actions>
           <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
-          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">
-            {{ dashboard?.running && !dashboard?.insecure ? '本地模式' : '打开' }}
-          </UButton>
+          <UButton v-if="dashboard?.running && !dashboard?.insecure" color="neutral" variant="outline" size="sm" disabled title="Dashboard 仅监听 127.0.0.1，如需外部打开请在 .env 中设置 HERMES_DASHBOARD_INSECURE=1 并重启">本地模式</UButton>
+          <UButton v-else color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
         </template>
       </StatusCard>
 

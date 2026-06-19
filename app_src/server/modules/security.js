@@ -58,8 +58,10 @@ export function isSafeWriteRequest(req) {
 
   function isTrusted(headerHost) {
     if (trustedHosts.has(headerHost) || trustedHosts.has(bareHost(headerHost))) return true;
-    // fnOS gateway 常见场景：Host 为 localhost，但 Origin/Referer 是内网 NAS IP（任意端口）
+    // fnOS gateway 常见场景：Host 为 localhost / Unix socket 内部名，但 Origin/Referer 是内网 NAS IP（任意端口）
     if (isLocalhost(reqHost) && isPrivateIPv4(headerHost)) return true;
+    // 兜底：只要来源是内网私有 IP，就允许写操作（NAS 应用默认在内网使用）
+    if (isPrivateIPv4(headerHost)) return true;
     return false;
   }
 
