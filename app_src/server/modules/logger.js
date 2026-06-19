@@ -1,18 +1,45 @@
 // @bun
 // 日志读取、WebSocket 广播与结构化日志（支持按天轮转）
-import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync, unlinkSync, statSync } from "fs";
+import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync, chmodSync, readdirSync, unlinkSync, statSync } from "fs";
 import { join } from "path";
 
 const LOG_DIR = process.env.HERMES_LOG_DIR || `${process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data"}/logs`;
 const MAX_LOG_DAYS = 7;
 
-try {
-  if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
-} catch (err) {
-  console.error("[logger] create log dir failed:", err);
+function ensureLogDir() {
+  try {
+    if (!existsSync(LOG_DIR)) {
+      mkdirSync(LOG_DIR, { recursive: true, mode: 0o750 });
+    }
+  } catch (err) {
+    console.error("[logger] create log dir failed:", err);
+    return;
+  }
+  // 尝试修复权限；若当前用户不是所有者则静默忽略（如测试/受限环境）
+  try {
+    chmodSync(LOG_DIR, 0o750);
+    for (const name of readdirSync(LOG_DIR)) {
+      if (name.startsWith("gateway-") && name.endsWith(".log")) {
+        try { chmodSync(join(LOG_DIR, name), 0o640); } catch {}
+      }
+    }
+  } catch {}
 }
 
-function getLogFileName(date = new Date()) {
+function secureAppendFileSync(filePath, line) {
+  try {
+    if (!existsSync(filePath)) {
+      writeFileSync(filePath, "", { mode: 0o640 });
+    }
+    appendFileSync(filePath, line + "\n");
+  } catch (err) {
+    console.error("[logger] write log failed:", err);
+  }
+}
+
+ensureLogDir();
+
+export function getLogFileName(date = new Date()) {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
@@ -63,12 +90,8 @@ export function log(levelOrSource, ...args) {
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
   else console.log(line);
-  try {
-    appendFileSync(getLogFileName(), line + "\n");
-    cleanupOldLogs();
-  } catch (err) {
-    console.error("[logger] write log failed:", err);
-  }
+  secureAppendFileSync(getLogFileName(), line);
+  cleanupOldLogs();
 }
 
 /**

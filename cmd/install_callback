@@ -59,11 +59,17 @@ mkdir -p "${CONFIG_DIR}" 2>/dev/null
 mkdir -p "${VENV_DIR}" 2>/dev/null
 log_msg "Directories created"
 
+# 权限加固：配置与日志目录限制为应用用户组内访问
+chmod 750 "${LOG_DIR}" 2>/dev/null || true
+chmod 750 "${CONFIG_DIR}" 2>/dev/null || true
+chmod 750 "${HOME_DIR}" 2>/dev/null || true
+
 # ---------------------------------------------------------------------------
 # 2. 部署 SOUL.md
 # ---------------------------------------------------------------------------
 if [ -f "${SOUL_MD_SRC}" ]; then
-    cp "${SOUL_MD_SRC}" "${CONFIG_DIR}/SOUL.md" 2>/dev/null
+    cp -f "${SOUL_MD_SRC}" "${CONFIG_DIR}/SOUL.md" 2>/dev/null
+    chmod 640 "${CONFIG_DIR}/SOUL.md" 2>/dev/null || true
     log_msg "SOUL.md deployed"
 fi
 
@@ -121,6 +127,8 @@ ENV
     printf '\nHERMES_DASHBOARD_PORT=%s\n' "${DASHBOARD_PORT}" >> "${CFG_TARGET}/.env.tmp"
     printf 'PIP_INDEX_URL=%s\n' "${PIP_INDEX_URL}" >> "${CFG_TARGET}/.env.tmp"
     mv -f "${CFG_TARGET}/.env.tmp" "${CFG_TARGET}/.env"
+    chmod 640 "${CFG_TARGET}/.env" 2>/dev/null || true
+    chmod 640 "${CFG_TARGET}/config.yaml" 2>/dev/null || true
     log_msg ".env updated in ${CFG_TARGET}"
 done
 

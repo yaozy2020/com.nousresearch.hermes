@@ -1,6 +1,6 @@
 // @bun
 // Web Terminal（ttyd 代理）
-import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, unlinkSync, appendFileSync, chmodSync } from "fs";
 import { createServer } from "net";
 
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
@@ -45,7 +45,10 @@ function readTtydInfo() {
 }
 
 function writeTtydInfo(pid, port) {
-  try { writeFileSync(TERM_INFO_FILE, JSON.stringify({ pid, port, started: new Date().toISOString() })); } catch {}
+  try {
+    writeFileSync(TERM_INFO_FILE, JSON.stringify({ pid, port, started: new Date().toISOString() }));
+    chmodSync(TERM_INFO_FILE, 0o640);
+  } catch {}
 }
 
 function clearTtydInfo() {
@@ -197,6 +200,7 @@ export async function startTtyd(cmdKey, options = {}) {
   }
 
   writeFileSync(TERM_PID_FILE, String(ttydProcess.pid));
+  try { chmodSync(TERM_PID_FILE, 0o640); } catch {}
   writeTtydInfo(ttydProcess.pid, port);
 
   // 收集 stdout/stderr 到日志，便于排查

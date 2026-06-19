@@ -120,6 +120,7 @@ export async function startGateway() {
   gatewayProcess = Bun.spawn([HERMES_BIN, "gateway", "run"], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
   processStartTimes.set(gatewayProcess.pid, Date.now());
   writeFileSync(PID_FILE, String(gatewayProcess.pid));
+  try { chmodSync(PID_FILE, 0o640); } catch {}
   (async () => {
     const reader = gatewayProcess.stdout.getReader();
     try {
@@ -213,6 +214,7 @@ export async function startDashboard() {
   dashboardProcess = Bun.spawn(dashboardArgs, { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
   processStartTimes.set(dashboardProcess.pid, Date.now());
   writeFileSync(DASHBOARD_PID_FILE, String(dashboardProcess.pid));
+  try { chmodSync(DASHBOARD_PID_FILE, 0o640); } catch {}
   (async () => {
     const reader = dashboardProcess.stdout.getReader();
     try {
