@@ -34,7 +34,10 @@ withDefaults(
           <span class="text-lg font-semibold text-[var(--ui-text)]">{{ title }}</span>
           <UBadge v-if="badge" :color="color" variant="soft" size="xs">{{ badge }}</UBadge>
         </div>
-        <p v-if="subtitle" class="text-sm text-[var(--ui-text-muted)] mt-1 whitespace-pre-line leading-snug font-mono">{{ subtitle }}</p>
+        <p v-if="subtitle && !$slots.details" class="text-sm text-[var(--ui-text-muted)] mt-1 whitespace-pre-line leading-snug">{{ subtitle }}</p>
+        <div v-if="$slots.details" class="text-sm text-[var(--ui-text-muted)] mt-1 leading-snug">
+          <slot name="details" />
+        </div>
       </div>
     </div>
     <div v-if="$slots.actions" class="flex flex-wrap justify-end gap-2 mt-auto pt-4">

@@ -232,8 +232,16 @@ onUnmounted(() => {
         :title="hermes ? (hermes.installed ? '已安装' : hermes.installing ? '安装中…' : '未安装') : '检查中…'"
         :badge="hermes ? (hermes.installed ? 'Installed' : hermes.installing ? 'Installing' : 'Not Installed') : 'Checking'"
         :color="hermes ? (hermes.installed ? 'success' : hermes.installing ? 'warning' : 'neutral') : 'neutral'"
-        :subtitle="hermes?.installed ? `Hermes   v${hermesVersion}\nDashboard v${hermesVersion}` : 'Hermes AI 助手运行环境'"
+        :subtitle="!hermes?.installed ? 'Hermes AI 助手运行环境' : undefined"
       >
+        <template v-if="hermes?.installed" #details>
+          <div class="grid grid-cols-[auto_1fr] gap-x-3">
+            <span class="text-[var(--ui-text-muted)]">Hermes</span>
+            <span class="font-mono text-[var(--ui-text)]">v{{ hermesVersion }}</span>
+            <span class="text-[var(--ui-text-muted)]">Dashboard</span>
+            <span class="font-mono text-[var(--ui-text)]">v{{ hermesVersion }}</span>
+          </div>
+        </template>
         <template #actions>
           <UButton v-if="!hermes?.installed && !hermes?.installing" color="primary" size="sm" @click="installHermes">一键安装</UButton>
         </template>
