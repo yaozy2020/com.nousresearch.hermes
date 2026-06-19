@@ -102,14 +102,31 @@ com.nousresearch.hermes/
 # 一键打包（自动安装 Bun 前端依赖、构建 Vue 工程、同步到 app_src/ui、生成 fpk）
 bash build.sh
 
-# 输出: com.nousresearch.hermes_v<VERSION>.fpk（约 950KB）
+# 输出: com.nousresearch.hermes_v<VERSION>.fpk（约 1.2 MB）
 ```
 
 `build.sh` 会安全地处理 `app_src/ui` 目录：保留 `config` 等运行时文件，只替换前端构建产物，避免误删用户配置。
 
 ## 版本历史
 
-### v0.22.0（当前版本）
+
+### v0.23.6（当前版本）
+
+- **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口；新增 `/ttyd-mobile` 全屏移动端终端壳；桌面端保留新标签页打开，移动端自动跳转移动壳
+- **修复 ttyd 终端黑屏/白屏**：移除 `--once`/`-O` 限制、重写 `Location` 避免 127.0.0.1 跳转、修复 WebSocket subprotocol、自动寻找可用端口、统一带斜杠访问 `/ttyd/`
+- **修复版本信息显示**：构建时将 Panel 版本写入 `build-meta.json`，运行时优先读取；Hermes 版本通过 `hermes --version` 异步读取并正则提取纯版本号
+- **状态总览增强**：新增 installing 状态、Gateway/Dashboard/Terminal 运行时间、Terminal 状态卡片；未运行改用 power-off 图标，运行中增加心跳动画
+
+| 能力 | v0.22.0 | v0.23.6 |
+|------|:-------:|:-------:|
+| 前端 UI | Vue 3 + Nuxt UI v4 重构 | 同上 + 状态卡片心跳动画 |
+| CLI 终端 | 桌面端新标签页打开 | 桌面端 + 移动端全屏壳 |
+| ttyd 连接 | 直接访问 9123 端口 | 主应用 `/ttyd/*` 反向代理 |
+| 版本显示 | Panel 可能 unknown | 构建时注入 `build-meta.json`，稳定显示 |
+| 安装状态 | 仅显示已安装/未安装 | 增加「安装中…」状态 |
+| 进程信息 | PID + 运行中/未运行 | 增加运行时间、Terminal 卡片 |
+| 响应式 | 桌面 + 移动布局 | 终端页单独移动端适配 |
+### v0.22.0
 
 - **前端 UI 全面重构**：基于 Vue 3 + Nuxt UI v4 + TailwindCSS v4 重写控制面板，复用 QwenPaw 控制台设计语言，视觉与 fnOS 系统更统一
 - **工程化治理**：后端 `server/index.js` 按职责拆分为 `modules/{config,hermes,logger,static,terminal,utils,version}.js`；新增 `shared/api-types.ts` 统一前后端类型
@@ -147,13 +164,6 @@ bash build.sh
 - agent 字段真实化：通过 `hermes --version` 实时探测 venv 内 hermes-agent，未安装时返回 `not_installed`，新增 `agent_installed` 布尔字段
 - socket 权限收紧：`com.nousresearch.hermes.sock` 由 0o777 改为 0o660（owner+group only）
 - 文案统一：「Hermes 官方 Web 界面」改为「Hermes 官方控制台」
-
-### v0.23.6
-
-- **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口；新增 `/ttyd-mobile` 全屏移动端终端壳；桌面端保留新标签页打开，移动端自动跳转移动壳
-- **修复 ttyd 终端黑屏/白屏**：移除 `--once`/`-O` 限制、重写 `Location` 避免 127.0.0.1 跳转、修复 WebSocket subprotocol、自动寻找可用端口、统一带斜杠访问 `/ttyd/`
-- **修复版本信息显示**：构建时将 Panel 版本写入 `build-meta.json`，运行时优先读取；Hermes 版本通过 `hermes --version` 异步读取并正则提取纯版本号
-- **状态总览增强**：新增 installing 状态、Gateway/Dashboard/Terminal 运行时间、Terminal 状态卡片；未运行改用 power-off 图标，运行中增加心跳动画
 
 ### v0.20.2
 
