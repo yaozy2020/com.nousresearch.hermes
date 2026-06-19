@@ -55,9 +55,13 @@ async function proxyTerminalHttp(req, pathname) {
       method: req.method,
       headers,
       body: req.body,
-      redirect: "manual"
+      redirect: "manual",
+      compress: false
     });
+    const body = await res.arrayBuffer();
     const resHeaders = new Headers(res.headers);
+    resHeaders.delete("content-encoding");
+    resHeaders.set("content-length", String(body.byteLength));
     // 重写 location，避免客户端跳到 127.0.0.1:<ttyd-port>
     const location = resHeaders.get("location");
     if (location) {
@@ -75,7 +79,7 @@ async function proxyTerminalHttp(req, pathname) {
         resHeaders.set("location", gatewayPrefix + location);
       }
     }
-    return new Response(res.body, { status: res.status, statusText: res.statusText, headers: resHeaders });
+    return new Response(body, { status: res.status, statusText: res.statusText, headers: resHeaders });
   } catch (err) {
     log("error", "ttyd proxy error:", err);
     return new Response("Terminal proxy error", { status: 502 });
@@ -277,22 +281,16 @@ const server = Bun.serve({
         const backendUrl = ws.data.backendUrl;
         if (!backendUrl) { ws.close(); return; }
         try {
-          log("info", "connecting backend ws", backendUrl);
           const backend = new WebSocket(backendUrl, ["tty"]);
           backend.binaryType = "arraybuffer";
           terminalProxies.set(ws, backend);
-          backend.onopen = () => {
-            log("info", "backend ws open", backendUrl);
-          };
           backend.onmessage = (event) => {
             try { ws.send(event.data); } catch {}
           };
-          backend.onclose = (e) => {
-            log("info", "backend ws close", e?.code, e?.reason);
+          backend.onclose = () => {
             try { ws.close(); } catch {}
           };
-          backend.onerror = (e) => {
-            log("error", "backend ws error", e?.message || e);
+          backend.onerror = () => {
             try { ws.close(); } catch {}
           };
           ws.onclose = () => {
@@ -310,14 +308,9 @@ const server = Bun.serve({
     },
     message(ws, msg) {
       if (ws.data?.type === "terminal") {
-        log("info", "terminal ws msg from client, type:", typeof msg, "size:", msg?.length || msg?.byteLength || 0);
         const backend = terminalProxies.get(ws);
-        if (backend) {
-          if (backend.readyState === WebSocket.OPEN) {
-            try { backend.send(msg); } catch {}
-          } else {
-            log("warn", "backend ws not open, state:", backend.readyState);
-          }
+        if (backend && backend.readyState === WebSocket.OPEN) {
+          try { backend.send(msg); } catch {}
         }
         return;
       }

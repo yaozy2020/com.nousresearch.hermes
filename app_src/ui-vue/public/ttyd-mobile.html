@@ -248,91 +248,29 @@
           frame.classList.remove('hidden');
           overlay.classList.add('hidden');
           showToast('终端已启动，点击终端区域唤起键盘');
-          frame.onload = () => {
-            appendDebug('iframe loaded: ' + frame.src);
+          frame.addEventListener('load', () => {
             try {
               const doc = frame.contentDocument;
               if (doc && doc.body) {
                 const s = doc.createElement('script');
                 s.textContent = `
                   window.onerror = function(msg, url, line, col, err) {
-                    parent.postMessage({type:'iframe-error', msg:String(msg), url:url, line:line, col:col, stack: err && err.stack ? String(err.stack) : ''}, '*');
+                    parent.postMessage({type:'iframe-error', msg:String(msg), stack: err && err.stack ? String(err.stack) : ''}, '*');
                     return false;
                   };
-                  ['log','warn','error','info'].forEach(function(level){
-                    var orig = console[level];
-                    console[level] = function(){
-                      var args = Array.prototype.slice.call(arguments);
-                      parent.postMessage({type:'iframe-console', level:level, msg:args.map(function(a){return String(a);}).join(' ')}, '*');
-                      if(orig) orig.apply(console, arguments);
-                    };
-                  });
                 `;
                 doc.body.appendChild(s);
-                appendDebug('iframe logger injected');
               }
-            } catch (e) {
-              appendDebug('inject iframe logger error: ' + e.message);
-            }
-          };
-          frame.onerror = (e) => { appendDebug('iframe error: ' + JSON.stringify(e)); };
+            } catch {}
+          });
           window.addEventListener('message', (e) => {
-            if (e.data && (e.data.type === 'iframe-error' || e.data.type === 'iframe-console')) {
-              appendDebug('iframe ' + e.data.type + ': ' + JSON.stringify(e.data));
+            if (e.data && e.data.type === 'iframe-error') {
+              appendDebug('iframe error: ' + JSON.stringify(e.data));
             }
           });
-          setTimeout(() => {
-            try {
-              const loc = frame.contentWindow.location;
-              appendDebug('iframe loc: ' + loc.href + ' ' + loc.pathname);
-            } catch (err) {
-              appendDebug('iframe loc inaccessible: ' + err.message);
-            }
-          }, 2000);
-          setTimeout(testConnections, 1500);
         } catch (e) {
           setOverlay(`启动失败：${e.message || '网络错误'}`, true);
           statusMeta.textContent = '启动失败';
-        }
-      }
-
-      async function testConnections() {
-        try {
-          const statusRes = await fetch('./api/terminal/status');
-          const status = await statusRes.json().catch(() => ({}));
-          appendDebug(`server status: running=${status.running} pid=${status.pid} port=${status.port}`);
-        } catch (e) {
-          appendDebug(`server status error: ${e.message}`);
-        }
-
-        const ttydUrl = new URL(TTYD_PATH, location.href);
-        const wsProto = ttydUrl.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${wsProto}//${ttydUrl.host}${ttydUrl.pathname.replace(/\/+$/, '')}/ws`;
-        appendDebug(`testing ws: ${wsUrl}`);
-        try {
-          const ws = new WebSocket(wsUrl, ['tty']);
-          ws.onopen = () => { appendDebug('ws test: OPEN'); ws.close(); };
-          ws.onmessage = (e) => { appendDebug(`ws test msg: ${e.data}`); };
-          ws.onerror = (e) => { appendDebug(`ws test: ERROR`); };
-          ws.onclose = (e) => { appendDebug(`ws test: CLOSE code=${e.code} reason=${e.reason || 'none'}`); };
-        } catch (e) {
-          appendDebug(`ws test exception: ${e.message}`);
-        }
-        try {
-          const logRes = await fetch('./api/terminal/ttyd_log');
-          const logText = await logRes.text();
-          const tail = logText.split('\n').slice(-20).join('\n');
-          appendDebug(`ttyd log tail:\n${tail || '(empty)'}`);
-        } catch (e) {
-          appendDebug(`ttyd log error: ${e.message}`);
-        }
-        try {
-          const svrRes = await fetch('./api/terminal/server_log');
-          const svrText = await svrRes.text();
-          const tail = svrText.split('\n').slice(-30).join('\n');
-          appendDebug(`server log tail:\n${tail || '(empty)'}`);
-        } catch (e) {
-          appendDebug(`server log error: ${e.message}`);
         }
       }
 
