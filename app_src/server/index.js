@@ -91,7 +91,7 @@ async function proxyTerminalHttp(req, pathname) {
     }
     return new Response(body, { status: res.status, statusText: res.statusText, headers: resHeaders });
   } catch (err) {
-    log("error", "ttyd proxy error:", err);
+    log("terminal", "error", "proxy error:", err);
     return new Response("Terminal proxy error", { status: 502 });
   }
 }
@@ -364,7 +364,7 @@ const server = Bun.serve({
             const chosen = protocols.split(",").map((s) => s.trim()).find((p) => p === "tty") || protocols.split(",")[0].trim();
             upgradeOpts.headers = { "Sec-WebSocket-Protocol": chosen };
           }
-          log("info", "terminal ws upgrade", pathname, "->", backendUrl, "protocols:", protocols || "none");
+          log("terminal", "info", "ws upgrade", pathname, "->", backendUrl, "protocols:", protocols || "none");
           if (srv.upgrade(req, upgradeOpts)) return;
           return new Response("Terminal upgrade failed", { status: 500 });
         }
@@ -406,7 +406,7 @@ const server = Bun.serve({
             try { backend.close(); } catch {}
           };
         } catch (err) {
-          log("error", "terminal ws proxy connect failed:", err);
+          log("terminal", "error", "ws proxy connect failed:", err);
           ws.close();
         }
         return;
@@ -435,13 +435,13 @@ const server = Bun.serve({
     }
   },
   error(err) {
-    log("error", "Server error:", err);
+    log("panel", "error", "Server error:", err);
     return json({ ok: false, error: "Internal Error" }, 500);
   }
 });
 
 try { chmodSync(SOCKET_PATH, 0o660); } catch {}
-log("info", `Listening on socket: ${SOCKET_PATH}`);
-log("info", `Static dir: ${STATIC_DIR}`);
-log("info", `Data dir: ${DATA_DIR}`);
-log("info", `Hermes bin: ${HERMES_BIN}`);
+log("panel", "info", `Listening on socket: ${SOCKET_PATH}`);
+log("panel", "info", `Static dir: ${STATIC_DIR}`);
+log("panel", "info", `Data dir: ${DATA_DIR}`);
+log("panel", "info", `Hermes bin: ${HERMES_BIN}`);

@@ -2,7 +2,6 @@
 // 日志读取、WebSocket 广播与结构化日志（支持按天轮转）
 import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync, unlinkSync, statSync } from "fs";
 import { join } from "path";
-import { swallowError } from "./error.js";
 
 const LOG_DIR = process.env.HERMES_LOG_DIR || `${process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data"}/logs`;
 const MAX_LOG_DAYS = 7;
@@ -10,7 +9,7 @@ const MAX_LOG_DAYS = 7;
 try {
   if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
 } catch (err) {
-  swallowError("create log dir", err);
+  console.error("[logger] create log dir failed:", err);
 }
 
 function getLogFileName(date = new Date()) {
@@ -34,19 +33,32 @@ function cleanupOldLogs() {
           unlinkSync(path);
         }
       } catch (err) {
-        swallowError(`cleanup log ${path}`, err);
+        console.error("[logger] cleanup log failed:", path, err);
       }
     }
   } catch (err) {
-    swallowError("cleanup old logs", err);
+    console.error("[logger] cleanup old logs failed:", err);
   }
 }
 
 export const wsClients = new Set();
 
-export function log(level, ...args) {
+const VALID_LEVELS = new Set(["error", "warn", "info", "debug"]);
+
+/**
+ * 写入结构化日志。
+ * 兼容旧调用：log("info", ...args) -> source="panel"
+ * 新调用：  log("gateway", "info", ...args) -> source="gateway"
+ */
+export function log(levelOrSource, ...args) {
+  let source = "panel";
+  let level = levelOrSource;
+  if (!VALID_LEVELS.has(levelOrSource) && args.length > 0 && VALID_LEVELS.has(args[0])) {
+    source = levelOrSource;
+    level = args.shift();
+  }
   const ts = new Date().toISOString();
-  const prefix = `[${ts}] [${level.toUpperCase()}]`;
+  const prefix = `[${ts}] [${level.toUpperCase()}] [${source}]`;
   const line = [prefix, ...args].join(" ");
   if (level === "error") console.error(line);
   else if (level === "warn") console.warn(line);
@@ -55,11 +67,20 @@ export function log(level, ...args) {
     appendFileSync(getLogFileName(), line + "\n");
     cleanupOldLogs();
   } catch (err) {
-    swallowError("write log", err);
+    console.error("[logger] write log failed:", err);
   }
 }
 
+/**
+ * 同时广播给前端并落盘。
+ * 若 text 以 [source] 开头，自动解析为来源；否则 source=panel。
+ */
 export function broadcastLog(text) {
+  const match = String(text).match(/^\[(\w+)\]\s*/);
+  const source = match ? match[1] : "panel";
+  const cleanText = match ? text.slice(match[0].length) : text;
+  log(source, "info", cleanText);
+
   const msg = JSON.stringify({ type: "log", data: text });
   for (const ws of wsClients) {
     try {
