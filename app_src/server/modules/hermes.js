@@ -112,8 +112,6 @@ export function getGatewayPid() {
 export async function startGateway() {
   if (isGatewayRunning()) return { ok: true, message: "already running", pid: getGatewayPid() };
   if (!existsSync(HERMES_BIN)) return { ok: false, error: "hermes binary not found. Reinstall the app." };
-  const logFile = `${LOG_DIR}/gateway.log`;
-  const logFd = Bun.file(logFile).writer();
   const env = {
     ...process.env,
     HERMES_HOME: `${DATA_DIR}/home`,
@@ -129,7 +127,6 @@ export async function startGateway() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        logFd.write(text).catch((err) => swallowError("gateway stdout log write", err));
         broadcastLog("[gateway] " + text);
       }
     } catch (err) {
@@ -143,7 +140,6 @@ export async function startGateway() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        logFd.write(text).catch((err) => swallowError("gateway stderr log write", err));
         broadcastLog("[gateway] " + text);
       }
     } catch (err) {
@@ -199,7 +195,6 @@ export async function startDashboard() {
     return { ok: false, error: `端口 ${DASHBOARD_PORT} 已被占用，请修改 HERMES_DASHBOARD_PORT 后重试` };
   }
 
-  const logFile = `${LOG_DIR}/dashboard.log`;
   const env = {
     ...process.env,
     HERMES_HOME: `${DATA_DIR}/home`,
@@ -225,7 +220,6 @@ export async function startDashboard() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        Bun.write(logFile, text, { append: true }).catch((err) => swallowError("dashboard stdout log write", err));
         broadcastLog("[dashboard] " + text);
       }
     } catch (err) {
@@ -239,7 +233,6 @@ export async function startDashboard() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        Bun.write(logFile, text, { append: true }).catch((err) => swallowError("dashboard stderr log write", err));
         broadcastLog("[dashboard] " + text);
       }
     } catch (err) {
