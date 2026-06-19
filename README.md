@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.22.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.23.6-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -147,6 +147,13 @@ bash build.sh
 - agent 字段真实化：通过 `hermes --version` 实时探测 venv 内 hermes-agent，未安装时返回 `not_installed`，新增 `agent_installed` 布尔字段
 - socket 权限收紧：`com.nousresearch.hermes.sock` 由 0o777 改为 0o660（owner+group only）
 - 文案统一：「Hermes 官方 Web 界面」改为「Hermes 官方控制台」
+
+### v0.23.6
+
+- **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口；新增 `/ttyd-mobile` 全屏移动端终端壳；桌面端保留新标签页打开，移动端自动跳转移动壳
+- **修复 ttyd 终端黑屏/白屏**：移除 `--once`/`-O` 限制、重写 `Location` 避免 127.0.0.1 跳转、修复 WebSocket subprotocol、自动寻找可用端口、统一带斜杠访问 `/ttyd/`
+- **修复版本信息显示**：构建时将 Panel 版本写入 `build-meta.json`，运行时优先读取；Hermes 版本通过 `hermes --version` 异步读取并正则提取纯版本号
+- **状态总览增强**：新增 installing 状态、Gateway/Dashboard/Terminal 运行时间、Terminal 状态卡片；未运行改用 power-off 图标，运行中增加心跳动画
 
 ### v0.20.2
 
