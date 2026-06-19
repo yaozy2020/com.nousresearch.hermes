@@ -106,6 +106,27 @@ export function getTtydPid() {
   return null;
 }
 
+function formatUptime(seconds) {
+  if (!seconds || seconds < 0) return null;
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  if (d > 0) return `${d}天${h}小时${m}分`;
+  if (h > 0) return `${h}小时${m}分${s}秒`;
+  if (m > 0) return `${m}分${s}秒`;
+  return `${s}秒`;
+}
+
+export function getTtydUptime() {
+  const info = readTtydInfo();
+  if (info?.started) {
+    const started = new Date(info.started).getTime();
+    if (!isNaN(started)) return formatUptime((Date.now() - started) / 1000);
+  }
+  return null;
+}
+
 export function getTtydPort() {
   if (currentTtydPort) return currentTtydPort;
   const info = readTtydInfo();

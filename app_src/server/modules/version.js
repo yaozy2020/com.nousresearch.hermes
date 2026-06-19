@@ -7,6 +7,28 @@ const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.herm
 const VENV_DIR = process.env.HERMES_VENV || `${DATA_DIR}/venv`;
 const HERMES_BIN = process.env.HERMES_BIN || `${VENV_DIR}/bin/hermes`;
 
+function parseKeyValue(text, key) {
+  const re = new RegExp(`^${key}\\s*=\\s*(.+)$`, "m");
+  const m = text.match(re);
+  return m ? m[1].trim() : null;
+}
+
+function readManifestVersion() {
+  const candidates = [
+    join(import.meta.dir, "..", "..", "manifest"),
+    "/var/packages/com.nousresearch.hermes/target/config/../manifest"
+  ];
+  for (const p of candidates) {
+    if (!existsSync(p)) continue;
+    try {
+      const text = readFileSync(p, "utf-8");
+      const v = parseKeyValue(text, "version");
+      if (v) return v;
+    } catch {}
+  }
+  return "unknown";
+}
+
 export function readPanelVersion() {
   const candidates = [
     join(import.meta.dir, "..", "..", "config", "hermes-version.env"),
@@ -15,34 +37,33 @@ export function readPanelVersion() {
   ];
   for (const p of candidates) {
     if (existsSync(p)) {
-      const text = readFileSync(p, "utf-8");
-      const m = text.match(/PANEL_VERSION\s*=\s*([0-9]+(?:\.[0-9]+)*)/);
-      if (m) return m[1];
+      try {
+        const text = readFileSync(p, "utf-8");
+        const m = text.match(/PANEL_VERSION\s*=\s*([0-9]+(?:\.[0-9]+)*)/);
+        if (m) return m[1];
+      } catch {}
     }
   }
-  try {
-    const pkg = JSON.parse(readFileSync(join(import.meta.dir, "..", "..", "manifest"), "utf-8"));
-    return pkg.version || "unknown";
-  } catch {
-    return "unknown";
-  }
+  return readManifestVersion();
 }
 
 export const PANEL_VERSION = readPanelVersion();
 
-export function readAgentVersion() {
+export async function readAgentVersion() {
   if (!existsSync(HERMES_BIN)) return null;
   try {
     const proc = Bun.spawn([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
-    return new Response(proc.stdout).text().then((t) => t.trim() || null);
+    const text = await new Response(proc.stdout).text();
+    return text.trim() || null;
   } catch {
     return null;
   }
 }
 
-export function getVersion() {
+export async function getVersion() {
+  const hermes = await readAgentVersion();
   return {
     panel: PANEL_VERSION,
-    hermes: existsSync(HERMES_BIN) ? "installed" : "not installed"
+    hermes: hermes || (existsSync(HERMES_BIN) ? "installed" : "not installed")
   };
 }

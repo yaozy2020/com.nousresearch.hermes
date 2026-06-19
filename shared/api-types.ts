@@ -10,13 +10,20 @@ export interface HealthResponse {
   ok: true;
   time: string;
   hermesInstalled: boolean;
+  hermesInstalling: boolean;
   venv: string;
   bin: string;
   gatewayRunning: boolean;
   gatewayPid: number | null;
+  gatewayUptime: string | null;
   dashboardRunning: boolean;
   dashboardPid: number | null;
+  dashboardUptime: string | null;
   dashboardPort: number;
+  ttydRunning: boolean;
+  ttydPid: number | null;
+  ttydUptime: string | null;
+  ttydPort: number | null;
   version: VersionInfo;
 }
 
@@ -29,11 +36,13 @@ export interface GatewayStatus {
 export interface DashboardStatus {
   running: boolean;
   pid?: number;
+  uptime?: string;
   port?: number;
 }
 
 export interface HermesInstallStatus {
   installed: boolean;
+  installing: boolean;
   venv: string;
   bin: string;
 }
@@ -81,6 +90,7 @@ export interface TerminalStatus {
   running: boolean;
   pid?: number;
   port?: number;
+  uptime?: string;
   ttyd_available: boolean;
   commands: string[];
 }

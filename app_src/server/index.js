@@ -7,11 +7,11 @@ import { json, parseBody } from "./modules/utils.js";
 import { serveStatic } from "./modules/static.js";
 import { getVersion } from "./modules/version.js";
 import {
-  isGatewayRunning, getGatewayPid, startGateway, stopGateway,
-  isDashboardRunning, getDashboardPid, startDashboard, stopDashboard,
-  installHermes, restartHermesAll
+  isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
+  isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
+  installHermes, restartHermesAll, isInstallInProgress
 } from "./modules/hermes.js";
-import { isTtydAlive, getTtydPid, getTtydPort, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
+import { isTtydAlive, getTtydPid, getTtydPort, getTtydUptime, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
 process.on("uncaughtException", (err) => log("error", "uncaughtException", err));
 process.on("unhandledRejection", (reason) => log("error", "unhandledRejection", reason));
@@ -97,21 +97,29 @@ async function handleRequest(req) {
         ok: true,
         time: new Date().toISOString(),
         hermesInstalled: existsSync(HERMES_BIN),
+        hermesInstalling: isInstallInProgress(),
         venv: VENV_DIR,
         bin: HERMES_BIN,
         gatewayRunning: isGatewayRunning(),
         gatewayPid: getGatewayPid(),
+        gatewayUptime: getGatewayUptime(),
         dashboardRunning: isDashboardRunning(),
         dashboardPid: getDashboardPid(),
+        dashboardUptime: getDashboardUptime(),
         dashboardPort: DASHBOARD_PORT,
-        version: getVersion()
+        ttydRunning: isTtydAlive(),
+        ttydPid: getTtydPid(),
+        ttydUptime: getTtydUptime(),
+        ttydPort: getTtydPort(),
+        version: await getVersion()
       });
     }
     if (pathname === "/api/status" && method === "GET") {
       return json({
         running: isGatewayRunning(),
         pid: getGatewayPid(),
-        version: getVersion()
+        uptime: getGatewayUptime(),
+        version: await getVersion()
       });
     }
     if (pathname === "/api/gateway/start" && method === "POST") {
@@ -159,10 +167,10 @@ async function handleRequest(req) {
       }
     }
     if (pathname === "/api/version" && method === "GET") {
-      return json(getVersion());
+      return json(await getVersion());
     }
     if (pathname === "/api/hermes/status" && method === "GET") {
-      return json({ installed: existsSync(HERMES_BIN), venv: VENV_DIR, bin: HERMES_BIN });
+      return json({ installed: existsSync(HERMES_BIN), installing: isInstallInProgress(), venv: VENV_DIR, bin: HERMES_BIN });
     }
     if (pathname === "/api/hermes/install" && method === "POST") {
       const body = await parseBody(req);
@@ -171,7 +179,7 @@ async function handleRequest(req) {
       return json(result, result.ok ? 200 : 500);
     }
     if (pathname === "/api/dashboard/status" && method === "GET") {
-      return json({ running: isDashboardRunning(), pid: getDashboardPid(), port: DASHBOARD_PORT });
+      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT });
     }
     if (pathname === "/api/dashboard/start" && method === "POST") {
       const result = await startDashboard();
@@ -202,6 +210,7 @@ async function handleRequest(req) {
         running: isTtydAlive(),
         pid: getTtydPid(),
         port: getTtydPort(),
+        uptime: getTtydUptime(),
         ttyd_available: existsSync(TTYD_BIN),
         commands: Object.keys(TERM_COMMANDS)
       });

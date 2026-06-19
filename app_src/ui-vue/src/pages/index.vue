@@ -5,18 +5,28 @@ import type { HealthResponse, LogResponse } from '@/types/api'
 
 interface HermesStatus {
   installed: boolean
+  installing?: boolean
   bin?: string
 }
 
 interface GatewayStatus {
   running: boolean
   pid?: number
+  uptime?: string
   version?: { panel?: string; hermes?: string }
 }
 
 interface DashboardStatus {
   running: boolean
   pid?: number
+  uptime?: string
+  port?: number
+}
+
+interface TerminalSummary {
+  running: boolean
+  pid?: number
+  uptime?: string
   port?: number
 }
 
@@ -31,6 +41,7 @@ function showNotification(message: string, type: 'success' | 'error' | 'warning'
 const hermes = ref<HermesStatus | null>(null)
 const gateway = ref<GatewayStatus | null>(null)
 const dashboard = ref<DashboardStatus | null>(null)
+const terminal = ref<TerminalSummary | null>(null)
 const recentLogs = ref<string>('')
 const loading = ref(false)
 const timer = ref<number | null>(null)
@@ -49,12 +60,14 @@ async function refreshOverview(notify = false) {
       hermes.value = { installed: false }
       gateway.value = { running: false }
       dashboard.value = { running: false }
+      terminal.value = { running: false }
       if (notify) showNotification('无法获取运行状态', 'error')
       return
     }
-    hermes.value = { installed: health.hermesInstalled, bin: health.bin }
-    gateway.value = { running: health.gatewayRunning, pid: health.gatewayPid ?? undefined, version: health.version }
-    dashboard.value = { running: health.dashboardRunning, pid: health.dashboardPid ?? undefined, port: health.dashboardPort }
+    hermes.value = { installed: health.hermesInstalled, installing: health.hermesInstalling, bin: health.bin }
+    gateway.value = { running: health.gatewayRunning, pid: health.gatewayPid ?? undefined, uptime: health.gatewayUptime ?? undefined, version: health.version }
+    dashboard.value = { running: health.dashboardRunning, pid: health.dashboardPid ?? undefined, uptime: health.dashboardUptime ?? undefined, port: health.dashboardPort }
+    terminal.value = { running: health.ttydRunning, pid: health.ttydPid ?? undefined, uptime: health.ttydUptime ?? undefined, port: health.ttydPort ?? undefined }
     const lines = l.lines || []
     recentLogs.value = lines.length ? lines.join('\n') : '暂无日志'
     if (notify) showNotification('状态已刷新', 'success')
@@ -98,6 +111,7 @@ async function dashboardAction(act: 'start' | 'stop') {
 
 async function installHermes() {
   showNotification('开始安装 Hermes，可能需要 1-3 分钟…', 'info')
+  if (hermes.value) hermes.value.installing = true
   try {
     const r = await api<{ ok: boolean; error?: string }>('api/hermes/install', {
       method: 'POST',
@@ -186,7 +200,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 状态卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
         <template #header>
           <div class="flex items-center gap-2">
@@ -196,13 +210,13 @@ onUnmounted(() => {
         </template>
         <div class="space-y-3">
           <div v-if="hermes" class="flex items-center gap-3">
-            <UBadge :color="hermes.installed ? 'success' : 'neutral'" variant="soft" size="md">
+            <UBadge :color="hermes.installed ? 'success' : hermes.installing ? 'warning' : 'neutral'" variant="soft" size="md">
               <template #leading>
-                <UIcon :name="hermes.installed ? 'i-lucide-check-circle' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+                <UIcon :name="hermes.installed ? 'i-lucide-check-circle' : hermes.installing ? 'i-lucide-loader-2' : 'i-lucide-stop-circle'" class="w-4 h-4" />
               </template>
-              {{ hermes.installed ? '已安装' : '未安装' }}
+              {{ hermes.installed ? '已安装' : hermes.installing ? '安装中…' : '未安装' }}
             </UBadge>
-            <UButton v-if="!hermes.installed" color="primary" size="sm" @click="installHermes">
+            <UButton v-if="!hermes.installed && !hermes.installing" color="primary" size="sm" @click="installHermes">
               一键安装
             </UButton>
           </div>
@@ -230,6 +244,7 @@ onUnmounted(() => {
             </UBadge>
             <span v-if="gateway.running" class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
+              <span v-if="gateway.uptime" class="ml-2">已运行 {{ gateway.uptime }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -258,6 +273,7 @@ onUnmounted(() => {
             </UBadge>
             <span v-if="dashboard.running" class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
+              <span v-if="dashboard.uptime" class="ml-2">已运行 {{ dashboard.uptime }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -265,6 +281,33 @@ onUnmounted(() => {
             <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
             <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
             <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
+          </div>
+        </div>
+      </UCard>
+
+      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+        <template #header>
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-terminal" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">Terminal</span>
+          </div>
+        </template>
+        <div class="space-y-3">
+          <div v-if="terminal" class="flex items-center gap-3">
+            <UBadge :color="terminal.running ? 'success' : 'neutral'" variant="soft" size="md">
+              <template #leading>
+                <UIcon :name="terminal.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+              </template>
+              {{ terminal.running ? '运行中' : '未运行' }}
+            </UBadge>
+            <span v-if="terminal.running" class="text-xs text-[var(--ui-text-muted)]">
+              PID <span class="font-mono text-[var(--ui-text)]">{{ terminal.pid || '-' }}</span>
+              <span v-if="terminal.uptime" class="ml-2">已运行 {{ terminal.uptime }}</span>
+            </span>
+          </div>
+          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
+          <div class="flex flex-wrap gap-2">
+            <UButton color="neutral" variant="outline" size="sm" :disabled="!terminal?.running" @click="$router.push('/terminal')">打开</UButton>
           </div>
         </div>
       </UCard>

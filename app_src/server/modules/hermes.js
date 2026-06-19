@@ -20,6 +20,42 @@ for (const d of [CONFIG_DIR, LOG_DIR, RUNTIME_DIR]) {
 let gatewayProcess = null;
 let dashboardProcess = null;
 let installInProgress = false;
+const processStartTimes = new Map();
+
+export function isInstallInProgress() {
+  return installInProgress;
+}
+
+function getProcessUptime(pid) {
+  if (!pid) return null;
+  const started = processStartTimes.get(pid);
+  if (started) {
+    const seconds = Math.floor((Date.now() - started) / 1000);
+    return seconds;
+  }
+  return null;
+}
+
+function formatUptime(seconds) {
+  if (seconds === null || seconds === undefined) return null;
+  if (seconds < 60) return `${seconds}s`;
+  const m = Math.floor(seconds / 60);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  const rm = m % 60;
+  if (h < 24) return `${h}h ${rm}m`;
+  const d = Math.floor(h / 24);
+  const rh = h % 24;
+  return `${d}d ${rh}h`;
+}
+
+export function getGatewayUptime() {
+  return formatUptime(getProcessUptime(getGatewayPid()));
+}
+
+export function getDashboardUptime() {
+  return formatUptime(getProcessUptime(getDashboardPid()));
+}
 
 export function isGatewayRunning() {
   if (gatewayProcess && gatewayProcess.pid) {
@@ -66,6 +102,7 @@ export async function startGateway() {
     HOME: `${DATA_DIR}/home`
   };
   gatewayProcess = Bun.spawn([HERMES_BIN, "gateway", "run"], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
+  processStartTimes.set(gatewayProcess.pid, Date.now());
   writeFileSync(PID_FILE, String(gatewayProcess.pid));
   (async () => {
     const reader = gatewayProcess.stdout.getReader();
@@ -158,6 +195,7 @@ export async function startDashboard() {
     HERMES_BIN, "dashboard", "--host", "0.0.0.0", "--port", String(DASHBOARD_PORT),
     "--insecure", "--skip-build", "--no-open"
   ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
+  processStartTimes.set(dashboardProcess.pid, Date.now());
   writeFileSync(DASHBOARD_PID_FILE, String(dashboardProcess.pid));
   (async () => {
     const reader = dashboardProcess.stdout.getReader();
