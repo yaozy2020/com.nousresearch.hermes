@@ -242,9 +242,9 @@ onUnmounted(() => {
               </template>
               {{ gateway.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span v-if="gateway.running" class="text-xs text-[var(--ui-text-muted)]">
+            <span class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
-              <span v-if="gateway.uptime" class="ml-2">已运行 {{ gateway.uptime }}</span>
+              <span class="ml-2">已运行 {{ gateway.uptime || '-' }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -271,9 +271,9 @@ onUnmounted(() => {
               </template>
               {{ dashboard.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span v-if="dashboard.running" class="text-xs text-[var(--ui-text-muted)]">
+            <span class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
-              <span v-if="dashboard.uptime" class="ml-2">已运行 {{ dashboard.uptime }}</span>
+              <span class="ml-2">已运行 {{ dashboard.uptime || '-' }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -300,9 +300,9 @@ onUnmounted(() => {
               </template>
               {{ terminal.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span v-if="terminal.running" class="text-xs text-[var(--ui-text-muted)]">
+            <span class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ terminal.pid || '-' }}</span>
-              <span v-if="terminal.uptime" class="ml-2">已运行 {{ terminal.uptime }}</span>
+              <span class="ml-2">已运行 {{ terminal.uptime || '-' }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
