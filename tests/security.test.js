@@ -47,6 +47,57 @@ describe("security / CSRF", () => {
     assert.strictEqual(isSafeWriteRequest(req), false);
   });
 
+  it("prefers Host header over req.url when checking origin", () => {
+    const req = {
+      method: "POST",
+      url: "http://localhost/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "192.168.10.236",
+            origin: "http://192.168.10.236"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), true);
+  });
+
+  it("allows private IP origin when req Host is localhost", () => {
+    const req = {
+      method: "POST",
+      url: "http://localhost/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "localhost",
+            origin: "http://192.168.10.236"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), true);
+  });
+
+  it("rejects public origin even when req Host is localhost", () => {
+    const req = {
+      method: "POST",
+      url: "http://localhost/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "localhost",
+            origin: "https://evil.com"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), false);
+  });
+
   it("allows HERMES_TRUSTED_HOSTS configured origin", () => {
     process.env.HERMES_TRUSTED_HOSTS = "gateway.fnos.local,192.168.10.1";
     const req = makeReq("POST", "http://nas.local/api/gateway/start", {
