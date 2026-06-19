@@ -167,6 +167,21 @@ async function openDashboard() {
   }
 }
 
+async function terminalAction(act: 'stop') {
+  const label = act === 'stop' ? '停止' : '启动'
+  showNotification(`终端正在${label}…`, 'info')
+  try {
+    const r = await api<{ ok: boolean; error?: string }>(`api/terminal/${act}`, { method: 'POST' })
+    if (r.ok) showNotification(`终端${label}成功`, 'success')
+    else showNotification(r.error || `${label}失败`, 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification(`${label}失败: ${err?.message ?? String(e)}`, 'error')
+  } finally {
+    refreshOverview()
+  }
+}
+
 onMounted(() => {
   refreshOverview()
   timer.value = window.setInterval(() => refreshOverview(), 5000)
@@ -263,6 +278,7 @@ onUnmounted(() => {
       >
         <template #actions>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!terminal?.running" @click="$router.push('/terminal')">打开</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!terminal?.running" @click="terminalAction('stop')">停止</UButton>
         </template>
       </StatusCard>
     </div>
