@@ -18,6 +18,10 @@ NC='\033[0m'
 
 echo "===== Hermes FPK 打包 ====="
 
+# 0. 把版本号写入构建元数据，避免真机运行时依赖 manifest 权限/路径
+echo "[0/6] 写入构建元数据 ..."
+echo "{\"version\":\"$VERSION\"}" > "$APP_SRC/server/modules/build-meta.json"
+
 # 1. 准备 build 目录
 echo "[1/6] 准备 build 目录 ..."
 rm -rf "$BUILD_DIR"
