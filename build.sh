@@ -55,8 +55,17 @@ node "$PROJ_DIR/scripts/check-api-types.cjs" || exit 1
 # 运行单元测试（Bun 优先，否则 Node.js）
 echo "  运行单元测试 ..."
 if command -v bun >/dev/null 2>&1; then
+  TEST_DATA_DIR="$(mktemp -d /tmp/hermes-test-XXXXXX)"
+  export HERMES_DATA_DIR="$TEST_DATA_DIR"
+  export HERMES_HOME="$TEST_DATA_DIR/home"
+  export HERMES_CONFIG_DIR="$TEST_DATA_DIR/home"
   cd "$PROJ_DIR" && bun test || exit 1
 else
+  # 非 root / 非应用用户环境下，默认 /var/apps 路径不可写，使用临时目录运行测试
+  TEST_DATA_DIR="$(mktemp -d /tmp/hermes-test-XXXXXX)"
+  export HERMES_DATA_DIR="$TEST_DATA_DIR"
+  export HERMES_HOME="$TEST_DATA_DIR/home"
+  export HERMES_CONFIG_DIR="$TEST_DATA_DIR/home"
   cd "$PROJ_DIR" && npm test || exit 1
 fi
 

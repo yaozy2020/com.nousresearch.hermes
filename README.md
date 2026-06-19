@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.4-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.4)
+[![Version](https://img.shields.io/badge/version-0.26.5-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.5)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,15 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.4（当前版本）
+### v0.26.5（当前版本）
+
+修复卸载后重装仍显示旧版本的问题：
+- 修正 `cmd/uninstall_callback` 的安全路径白名单，匹配 fnOS 真实 `TRIM_PKGHOME=/vol2/@apphome/<pkg>`，不再误判为不安全路径。
+- 默认删除运行环境，保留配置文件，避免 venv / runtime / state / logs 残留导致重装后状态异常。
+- 卸载调试日志改为每次 `mktemp` 独立文件并 `chmod 666`，避免固定日志文件被当前用户占用导致应用用户无法写入。
+- 保留对旧版 `wizard_keep_config` / `wizard_keep_runtime` / `wizard_delete_data` 的兼容。
+
+### v0.26.4
 
 重新设计卸载向导，降低误操作：
 - 合并为「保留用户数据」和「确认删除用户数据」两个开关，默认保留数据，重装后可自动恢复。
