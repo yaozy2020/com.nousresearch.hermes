@@ -237,6 +237,16 @@ export async function stopDashboard() {
   return { ok: true, message: "stopped" };
 }
 
+function getPipIndexArgs() {
+  const indexUrl = process.env.PIP_INDEX_URL || "https://pypi.tuna.tsinghua.edu.cn/simple";
+  const args = ["-i", indexUrl];
+  try {
+    const u = new URL(indexUrl);
+    if (u.hostname) args.push("--trusted-host", u.hostname);
+  } catch {}
+  return args;
+}
+
 export async function installHermes(packageSpec) {
   if (installInProgress) return { ok: false, error: "Installation already in progress" };
   if (existsSync(HERMES_BIN)) return { ok: true, message: "already installed", bin: HERMES_BIN };
@@ -259,11 +269,13 @@ export async function installHermes(packageSpec) {
       await venvProc.exited;
     }
     const pip = `${VENV_DIR}/bin/pip`;
+    const pipIndexArgs = getPipIndexArgs();
+    broadcastLog(`[install] Using pip index: ${pipIndexArgs[1]}\n`);
     broadcastLog("[install] Upgrading pip ...\n");
-    const upgradeProc = Bun.spawn([pip, "install", "--upgrade", "pip", "wheel", "setuptools", "-q"], { stdout: "pipe", stderr: "pipe" });
+    const upgradeProc = Bun.spawn([pip, "install", "--upgrade", "pip", "wheel", "setuptools", "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
     await upgradeProc.exited;
     broadcastLog(`[install] Installing ${packageSpec} ...\n`);
-    const installProc = Bun.spawn([pip, "install", packageSpec, "-q"], { stdout: "pipe", stderr: "pipe" });
+    const installProc = Bun.spawn([pip, "install", packageSpec, "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
     (async () => {
       const reader = installProc.stderr.getReader();
       try {

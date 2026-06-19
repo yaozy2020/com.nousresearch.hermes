@@ -4,6 +4,9 @@
 export interface VersionInfo {
   panel: string
   hermes: string
+  dashboard: string
+  venv: string
+  dataDir: string
 }
 
 export interface HealthResponse {

@@ -249,7 +249,7 @@ onMounted(initWizard)
     <UCard v-if="currentStep === 1" class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-download" class="w-5 h-5 text-primary" />
+          <UIcon name="i-lucide-layers" class="w-5 h-5 text-primary" />
           <span class="font-semibold text-[var(--ui-text)]">步骤 1：安装 Hermes</span>
         </div>
       </template>
@@ -271,7 +271,7 @@ onMounted(initWizard)
     <UCard v-if="currentStep === 2" class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-brain" class="w-5 h-5 text-primary" />
+          <UIcon name="i-lucide-key-round" class="w-5 h-5 text-primary" />
           <span class="font-semibold text-[var(--ui-text)]">步骤 2：选择 Provider</span>
         </div>
       </template>

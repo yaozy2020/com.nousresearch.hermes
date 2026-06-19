@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.23.9-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.23.9)
+[![Version](https://img.shields.io/badge/version-0.24.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.24.1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,19 @@ bash build.sh
 ## 版本历史
 
 
-### v0.23.9（当前版本）
+### v0.24.1（当前版本）
+
+v0.24 系列正式版，在 v0.23.9 基础上进一步打磨移动端体验、安装向导与信息展示：
+
+- **CLI 终端移动端快捷键后端代理**：前端不再依赖 xterm iframe 注入，改走 `/api/terminal/send` 转发输入帧；`Ctrl+C` 改走 `/api/terminal/signal` 向 ttyd 子进程发送 `SIGINT`，可真正中断命令；修复 HTML `data-seq` 中 `\uXXXX` 被当普通字符的问题
+- **状态卡片 QwenPaw 服务风格**：统一左侧圆角图标区 + 状态点 + 标题/Badge/副标题，卡片等高开齐；已安装 Hermes 时同时显示 Hermes 版本与 Dashboard 版本
+- **桌面端桌面图标修复**：`ICON.PNG` / `ICON_256.PNG` 转换为 16-bit RGBA，解决 fnOS 桌面渲染占位图的问题
+- **应用商店安装向导增强**：支持自定义 Dashboard 端口（默认 9119，留空走默认）；新增 pip 源选择步骤（默认清华源），安装时写入 `.env` 并在面板一键安装 `hermes-agent` 时生效
+- **关于页信息补全**：新增 Dashboard 版本行；新增 Venv / 数据目录显示；主题色提示仅在用户主动切换时弹出，避免每次进入关于页都弹窗
+- **移动端底部导航优化**：「更多」改为下拉菜单，包含消息频道 / 日志 / 关于，解决原先只能跳转到关于的问题
+- **版本信息显示修复**：后端 `getVersion()` 返回 `venv` 与 `dataDir`，避免关于页显示为 `-`
+
+### v0.23.9
 
 0.23.x 统一版本，集中包含以下改进与修复：
 

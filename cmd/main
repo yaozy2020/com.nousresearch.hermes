@@ -28,8 +28,16 @@ SOCKET_PATH="${TRIM_APPDEST}/com.nousresearch.hermes.sock"
 # Hermes venv (Python runtime for gateway)
 HERMES_VENV="${HERMES_DATA_DIR}/venv"
 HERMES_BIN="${HERMES_VENV}/bin/hermes"
+HERMES_HOME="${HERMES_DATA_DIR}/home"
 
-CMD="env HERMES_DATA_DIR=\"${HERMES_DATA_DIR}\" STATIC_DIR=\"${STATIC_DIR}\" SOCKET_PATH=\"${SOCKET_PATH}\" HERMES_VENV=\"${HERMES_VENV}\" HERMES_BIN=\"${HERMES_BIN}\" HERMES_PANEL_BIN=\"${HERMES_PANEL_BIN}\" bun \"${SERVER_SCRIPT}\""
+# 加载用户在安装向导中设置的端口等环境变量
+if [ -f "${HERMES_HOME}/.env" ]; then
+    set -a
+    . "${HERMES_HOME}/.env"
+    set +a
+fi
+
+CMD="env HERMES_DATA_DIR=\"${HERMES_DATA_DIR}\" STATIC_DIR=\"${STATIC_DIR}\" SOCKET_PATH=\"${SOCKET_PATH}\" HERMES_VENV=\"${HERMES_VENV}\" HERMES_BIN=\"${HERMES_BIN}\" HERMES_PANEL_BIN=\"${HERMES_PANEL_BIN}\" HERMES_DASHBOARD_PORT=\"${HERMES_DASHBOARD_PORT:-9119}\" bun \"${SERVER_SCRIPT}\""
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ${LOG_FILE}

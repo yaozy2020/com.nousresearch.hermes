@@ -27,6 +27,16 @@ const TTYD_BIN = `${BIN_DIR}/ttyd`;
 
 // 活跃终端 WebSocket 代理连接：clientWs -> backendWs
 const terminalProxies = new Map();
+let activeTerminalBackend = null;
+
+function getTtydChildPids(pid) {
+  const path = `/proc/${pid}/task/${pid}/children`;
+  if (!existsSync(path)) return [];
+  try {
+    const text = readFileSync(path, "utf-8").trim();
+    return text ? text.split(/\s+/).map(Number).filter((n) => n > 0) : [];
+  } catch { return []; }
+}
 
 function stripGatewayPrefix(pathname) {
   const GATEWAY_PREFIX = "/app/com-nousresearch-hermes";
@@ -215,6 +225,42 @@ async function handleRequest(req) {
         commands: Object.keys(TERM_COMMANDS)
       });
     }
+    if (pathname === "/api/terminal/send" && method === "POST") {
+      const body = await parseBody(req);
+      const seq = (body && body.input) || (body && body.cmd) || (body && body.data) || "";
+      if (!activeTerminalBackend || activeTerminalBackend.readyState !== WebSocket.OPEN) {
+        return json({ ok: false, error: "终端未连接" }, 400);
+      }
+      try {
+        const encoded = new TextEncoder().encode(seq);
+        const payload = new Uint8Array(1 + encoded.length);
+        payload[0] = 0x30; // ttyd Command.INPUT
+        payload.set(encoded, 1);
+        activeTerminalBackend.send(payload);
+        return json({ ok: true });
+      } catch (err) {
+        return json({ ok: false, error: String(err) }, 500);
+      }
+    }
+    if (pathname === "/api/terminal/signal" && method === "POST") {
+      const body = await parseBody(req);
+      const sig = (body && body.signal) || "SIGINT";
+      const pid = getTtydPid();
+      if (!pid) return json({ ok: false, error: "终端未运行" }, 400);
+      const children = getTtydChildPids(pid);
+      if (children.length === 0) {
+        // 没拿到子进程时直接发给 ttyd 自己，让它处理
+        try { process.kill(pid, sig); return json({ ok: true }); } catch (err) {
+          return json({ ok: false, error: String(err) }, 500);
+        }
+      }
+      let ok = false;
+      for (const child of children) {
+        try { process.kill(child, sig); ok = true; } catch {}
+        try { process.kill(-child, sig); } catch {}
+      }
+      return json({ ok });
+    }
     if (pathname === "/api/terminal/start" && method === "POST") {
       const body = await parseBody(req);
       const cmd = (body && body.cmd) || "setup";
@@ -293,10 +339,14 @@ const server = Bun.serve({
           const backend = new WebSocket(backendUrl, ["tty"]);
           backend.binaryType = "arraybuffer";
           terminalProxies.set(ws, backend);
+          backend.onopen = () => {
+            activeTerminalBackend = backend;
+          };
           backend.onmessage = (event) => {
             try { ws.send(event.data); } catch {}
           };
           backend.onclose = () => {
+            if (activeTerminalBackend === backend) activeTerminalBackend = null;
             try { ws.close(); } catch {}
           };
           backend.onerror = () => {
@@ -304,6 +354,7 @@ const server = Bun.serve({
           };
           ws.onclose = () => {
             terminalProxies.delete(ws);
+            if (activeTerminalBackend === backend) activeTerminalBackend = null;
             try { backend.close(); } catch {}
           };
         } catch (err) {

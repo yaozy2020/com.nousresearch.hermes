@@ -13,9 +13,53 @@
 	}]
 },
 {
+	"stepTitle": "端口设置",
+	"items": [{
+		"type": "tips",
+		"helpText": "Hermes Dashboard 默认使用 9119 端口。如需修改请填写 1-65535 之间的端口号，留空或保持默认则使用 9119。"
+	}, {
+		"type": "text",
+		"field": "HERMES_DASHBOARD_PORT",
+		"label": "Dashboard 端口",
+		"value": "9119",
+		"rules": [{
+			"pattern": "^[0-9]{1,5}$",
+			"message": "端口号需为 1-65535 之间的数字"
+		}]
+	}]
+},
+{
 	"stepTitle": "确认安装",
 	"items": [{
 		"type": "tips",
-		"helpText": "点击「下一步」开始安装。安装过程会创建独立用户、初始化 venv 目录与配置文件，约需 10-30 秒。\n\nhermes-agent Python 包不在本步安装，会在控制面板「快速向导」第 1 步或 CLI 终端内按需拉取（需 1-3 分钟）。"
+		"helpText": "安装过程会创建独立用户、初始化 venv 目录与配置文件，约需 10-30 秒。\n\nhermes-agent Python 包不在本步安装，会在控制面板「快速向导」第 1 步或 CLI 终端内按需拉取（需 1-3 分钟）。"
+	}]
+},
+{
+	"stepTitle": "pip 源选择",
+	"items": [{
+		"type": "tips",
+		"helpText": "选择安装 hermes-agent 时使用的 pip 镜像源。默认使用清华源，可显著提升国内安装速度。"
+	}, {
+		"type": "radio",
+		"field": "PIP_INDEX_URL",
+		"label": "pip 镜像源",
+		"initValue": "https://pypi.tuna.tsinghua.edu.cn/simple",
+		"options": [{
+			"label": "清华镜像（默认）",
+			"value": "https://pypi.tuna.tsinghua.edu.cn/simple"
+		}, {
+			"label": "官方 PyPI",
+			"value": "https://pypi.org/simple"
+		}, {
+			"label": "阿里云镜像",
+			"value": "https://mirrors.aliyun.com/pypi/simple"
+		}, {
+			"label": "中科大镜像",
+			"value": "https://pypi.mirrors.ustc.edu.cn/simple"
+		}, {
+			"label": "豆瓣镜像",
+			"value": "http://pypi.douban.com/simple"
+		}]
 	}]
 }]

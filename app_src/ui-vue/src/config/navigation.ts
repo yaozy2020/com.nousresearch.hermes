@@ -78,7 +78,23 @@ export const navigationConfig: NavigationConfig = {
     {
       label: '更多',
       icon: 'i-lucide-menu',
-      to: '/about',
+      children: [
+        {
+          label: '消息频道',
+          icon: 'i-lucide-message-square',
+          to: '/channels',
+        },
+        {
+          label: '日志',
+          icon: 'i-lucide-file-text',
+          to: '/logs',
+        },
+        {
+          label: '关于',
+          icon: 'i-lucide-info',
+          to: '/about',
+        },
+      ],
     },
   ]
 }

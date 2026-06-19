@@ -299,33 +299,78 @@
         showToast('已尝试聚焦终端');
       });
 
-      // 特殊键：复制到剪贴板，并提示用户粘贴
+      const API_SEND = './api/terminal/send';
+      const API_SIGNAL = './api/terminal/signal';
+
+      async function sendSignal(signal, label) {
+        if (!started) {
+          showToast('终端尚未启动');
+          return false;
+        }
+        try {
+          const res = await fetch(API_SIGNAL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ signal })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) {
+            showToast(data.error || `${label} 发送失败`);
+            return false;
+          }
+          return true;
+        } catch (e) {
+          showToast(`${label} 发送失败：` + (e.message || '网络错误'));
+          return false;
+        }
+      }
+
+      async function sendSequence(seq, label) {
+        if (!started) {
+          showToast('终端尚未启动');
+          return false;
+        }
+        try {
+          const res = await fetch(API_SEND, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ input: seq })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) {
+            showToast(data.error || '发送失败，请重试');
+            return false;
+          }
+          return true;
+        } catch (e) {
+          showToast('发送失败：' + (e.message || '网络错误'));
+          return false;
+        }
+      }
+
+      function decodeSeq(s) {
+        return s.replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)));
+      }
+
+      // 特殊键：通过后端代理直接发送到 ttyd WebSocket
       document.querySelectorAll('.toolbar .key').forEach((btn) => {
         btn.addEventListener('click', async () => {
-          const seq = btn.dataset.seq;
+          const seq = decodeSeq(btn.dataset.seq || '');
           const label = btn.dataset.copy || btn.textContent;
-          try {
-            // 先尝试直接注入到 iframe 的 xterm 输入框
-            let injected = false;
+          // Ctrl+C 用信号强制中断，其他键走输入流
+          let ok = false;
+          if (seq === '\u0003') {
+            ok = await sendSignal('SIGINT', label);
+          } else {
+            ok = await sendSequence(seq, label);
+          }
+          if (ok) {
+            showToast(`${label} 已发送`);
+          } else {
             try {
-              const doc = frame.contentDocument;
-              if (doc) {
-                const ta = doc.querySelector('.xterm-helper-textarea');
-                if (ta && document.execCommand) {
-                  ta.focus();
-                  const ok = document.execCommand('insertText', false, seq);
-                  if (ok) injected = true;
-                }
-              }
-            } catch {}
-            if (!injected) {
               await navigator.clipboard.writeText(seq);
               showToast(`${label} 已复制，请粘贴到终端`);
-            } else {
-              showToast(`${label} 已发送`);
-            }
-          } catch (e) {
-            showToast('发送失败，请使用系统键盘');
+            } catch {}
           }
         });
       });
@@ -334,18 +379,8 @@
         try {
           const text = await navigator.clipboard.readText();
           if (!text) return;
-          let injected = false;
-          try {
-            const doc = frame.contentDocument;
-            if (doc) {
-              const ta = doc.querySelector('.xterm-helper-textarea');
-              if (ta && document.execCommand) {
-                ta.focus();
-                injected = document.execCommand('insertText', false, text);
-              }
-            }
-          } catch {}
-          showToast(injected ? '已粘贴' : '剪贴板内容已复制，请手动粘贴');
+          const ok = await sendSequence(text, '粘贴');
+          showToast(ok ? '已粘贴' : '剪贴板内容已复制，请手动粘贴');
         } catch (e) {
           showToast('无法读取剪贴板，请长按终端区域粘贴');
         }

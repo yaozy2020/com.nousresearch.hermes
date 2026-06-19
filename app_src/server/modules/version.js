@@ -140,7 +140,10 @@ export async function getVersion() {
   const hermes = await readAgentVersion();
   return {
     panel: PANEL_VERSION,
-    hermes: hermes || (existsSync(HERMES_BIN) ? "installed" : "not installed")
+    hermes: hermes || (existsSync(HERMES_BIN) ? "installed" : "not installed"),
+    dashboard: hermes || (existsSync(HERMES_BIN) ? "installed" : "not installed"),
+    venv: VENV_DIR,
+    dataDir: DATA_DIR
   };
 }
 

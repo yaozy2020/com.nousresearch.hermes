@@ -70,8 +70,26 @@ fi
 # ---------------------------------------------------------------------------
 # 3. 创建默认配置（如果不存在）
 # ---------------------------------------------------------------------------
-if [ ! -f "${CONFIG_DIR}/config.yaml" ]; then
-    cat > "${CONFIG_DIR}/config.yaml" << 'YAML'
+# 面板从 HERMES_HOME（data/home）读取配置，优先写到 HOME_DIR
+DASHBOARD_PORT="${HERMES_DASHBOARD_PORT:-9119}"
+if ! [[ "${DASHBOARD_PORT}" =~ ^[0-9]+$ ]] || [ "${DASHBOARD_PORT}" -lt 1 ] || [ "${DASHBOARD_PORT}" -gt 65535 ]; then
+    log_msg "Invalid HERMES_DASHBOARD_PORT=${HERMES_DASHBOARD_PORT}, fallback to 9119"
+    DASHBOARD_PORT="9119"
+fi
+log_msg "Dashboard port: ${DASHBOARD_PORT}"
+
+# pip 源（安装 hermes-agent 时使用，默认清华镜像）
+PIP_INDEX_URL="${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+if [[ -z "${PIP_INDEX_URL}" ]] || [[ ! "${PIP_INDEX_URL}" =~ ^https?:// ]]; then
+    log_msg "Invalid PIP_INDEX_URL=${PIP_INDEX_URL}, fallback to tsinghua"
+    PIP_INDEX_URL="https://pypi.tuna.tsinghua.edu.cn/simple"
+fi
+log_msg "pip index url: ${PIP_INDEX_URL}"
+
+for CFG_TARGET in "${HOME_DIR}" "${CONFIG_DIR}"; do
+    mkdir -p "${CFG_TARGET}" 2>/dev/null
+    if [ ! -f "${CFG_TARGET}/config.yaml" ]; then
+        cat > "${CFG_TARGET}/config.yaml" << YAML
 # Hermes Configuration
 # Managed by Hermes Control Panel
 
@@ -86,18 +104,25 @@ gateway:
 
 dashboard:
   enabled: false
-  port: 9119
+  port: ${DASHBOARD_PORT}
 YAML
-    log_msg "Default config.yaml created"
-fi
+        log_msg "Default config.yaml created in ${CFG_TARGET}"
+    fi
 
-if [ ! -f "${CONFIG_DIR}/.env" ]; then
-    cat > "${CONFIG_DIR}/.env" << 'ENV'
+    # 创建/更新 .env，确保 HERMES_DASHBOARD_PORT 与面板保持一致
+    if [ ! -f "${CFG_TARGET}/.env" ]; then
+        cat > "${CFG_TARGET}/.env" << 'ENV'
 # Hermes Environment Variables
 # API keys and secrets stored here
 ENV
-    log_msg "Default .env created"
-fi
+    fi
+    # 去重写入端口与 pip 源
+    grep -v -e '^HERMES_DASHBOARD_PORT=' -e '^PIP_INDEX_URL=' "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp" 2>/dev/null || cat "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp"
+    printf '\nHERMES_DASHBOARD_PORT=%s\n' "${DASHBOARD_PORT}" >> "${CFG_TARGET}/.env.tmp"
+    printf 'PIP_INDEX_URL=%s\n' "${PIP_INDEX_URL}" >> "${CFG_TARGET}/.env.tmp"
+    mv -f "${CFG_TARGET}/.env.tmp" "${CFG_TARGET}/.env"
+    log_msg ".env updated in ${CFG_TARGET}"
+done
 
 # ---------------------------------------------------------------------------
 # 4. 写入版本信息

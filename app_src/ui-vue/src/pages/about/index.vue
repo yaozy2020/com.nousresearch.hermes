@@ -5,6 +5,7 @@ import { api } from '@/composables/useApi'
 interface VersionInfo {
   panel?: string
   hermes?: string
+  dashboard?: string
   venv?: string
   dataDir?: string
 }
@@ -57,7 +58,7 @@ function applyThemeColor(color: string, dim: string) {
   root.style.setProperty('--brand-color-dim', dim)
 }
 
-function setTheme(name: string) {
+function setTheme(name: string, silent = false) {
   const t = themes.find(x => x.id === name)
   if (!t) return
 
@@ -80,7 +81,7 @@ function setTheme(name: string) {
 
   currentTheme.value = name
   try { localStorage.setItem('hermes-theme', name) } catch {}
-  notify(`已切换为 ${t.name}`, 'success')
+  if (!silent) notify(`已切换为 ${t.name}`, 'success')
 }
 
 onMounted(() => {
@@ -89,7 +90,7 @@ onMounted(() => {
     const saved = localStorage.getItem('hermes-theme')
     if (saved && themes.some(t => t.id === saved)) {
       currentTheme.value = saved
-      setTheme(saved)
+      setTheme(saved, true)
     }
   } catch {}
 })
@@ -117,6 +118,10 @@ onMounted(() => {
         <div class="border-b border-[var(--ui-border)] pb-2">
           <div class="text-[var(--ui-text-muted)] mb-0.5">Hermes</div>
           <div class="font-mono text-[var(--ui-text)] break-all">{{ version.hermes || '-' }}</div>
+        </div>
+        <div class="border-b border-[var(--ui-border)] pb-2">
+          <div class="text-[var(--ui-text-muted)] mb-0.5">Dashboard</div>
+          <div class="font-mono text-[var(--ui-text)] break-all">{{ version.dashboard || '-' }}</div>
         </div>
         <div class="border-b border-[var(--ui-border)] pb-2">
           <div class="text-[var(--ui-text-muted)] mb-0.5">Venv</div>
