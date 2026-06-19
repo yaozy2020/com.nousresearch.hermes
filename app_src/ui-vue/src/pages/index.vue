@@ -211,7 +211,10 @@ onUnmounted(() => {
         :status-animated="hermes?.installing"
       >
         <template v-if="hermes?.installed && hermes.bin" #footer>
-          路径：<span class="font-mono text-[var(--ui-text)]">{{ hermes.bin }}</span>
+          <div class="flex flex-col gap-0.5">
+            <span class="text-[var(--ui-text-muted)]">路径</span>
+            <span class="font-mono text-[var(--ui-text)] break-all leading-tight">{{ hermes.bin }}</span>
+          </div>
         </template>
         <template #actions>
           <UButton v-if="!hermes?.installed && !hermes?.installing" color="primary" size="sm" @click="installHermes">一键安装</UButton>
