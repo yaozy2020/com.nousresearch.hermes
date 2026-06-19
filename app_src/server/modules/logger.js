@@ -2,13 +2,16 @@
 // 日志读取、WebSocket 广播与结构化日志（支持按天轮转）
 import { existsSync, readFileSync, appendFileSync, mkdirSync, readdirSync, unlinkSync, statSync } from "fs";
 import { join } from "path";
+import { swallowError } from "./error.js";
 
 const LOG_DIR = process.env.HERMES_LOG_DIR || `${process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data"}/logs`;
 const MAX_LOG_DAYS = 7;
 
 try {
   if (!existsSync(LOG_DIR)) mkdirSync(LOG_DIR, { recursive: true });
-} catch {}
+} catch (err) {
+  swallowError("create log dir", err);
+}
 
 function getLogFileName(date = new Date()) {
   const y = date.getFullYear();
@@ -30,9 +33,13 @@ function cleanupOldLogs() {
         if (now - stat.mtimeMs > maxAgeMs) {
           unlinkSync(path);
         }
-      } catch {}
+      } catch (err) {
+        swallowError(`cleanup log ${path}`, err);
+      }
     }
-  } catch {}
+  } catch (err) {
+    swallowError("cleanup old logs", err);
+  }
 }
 
 export const wsClients = new Set();
@@ -47,7 +54,9 @@ export function log(level, ...args) {
   try {
     appendFileSync(getLogFileName(), line + "\n");
     cleanupOldLogs();
-  } catch {}
+  } catch (err) {
+    swallowError("write log", err);
+  }
 }
 
 export function broadcastLog(text) {

@@ -1,6 +1,7 @@
 # 构建产物
 build/
 *.fpk
+app_src/server/modules/build-meta.json
 
 # 前端构建产物（由 build.sh 从 ui-vue/dist 同步生成）
 app_src/ui/index.html

@@ -1,0 +1,10 @@
+{
+  "name": "com.nousresearch.hermes",
+  "version": "0.25.5",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/**/*.test.js",
+    "lint:server": "node --check app_src/server/index.js"
+  }
+}

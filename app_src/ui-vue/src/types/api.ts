@@ -77,7 +77,7 @@ export interface ChannelInfo {
 }
 
 export interface ChannelMap {
-  [channel: string]: ChannelInfo
+  [key: string]: ChannelInfo
 }
 
 export interface ChannelsResponse {

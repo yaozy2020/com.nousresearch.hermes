@@ -3,6 +3,7 @@
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from "fs";
 import { createServer } from "net";
 import { broadcastLog } from "./logger.js";
+import { swallowError } from "./error.js";
 
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
 const VENV_DIR = process.env.HERMES_VENV || `${DATA_DIR}/venv`;
@@ -128,10 +129,12 @@ export async function startGateway() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        logFd.write(text).catch(() => {});
+        logFd.write(text).catch((err) => swallowError("gateway stdout log write", err));
         broadcastLog("[gateway] " + text);
       }
-    } catch {}
+    } catch (err) {
+      swallowError("gateway stdout reader", err);
+    }
   })();
   (async () => {
     const reader = gatewayProcess.stderr.getReader();
@@ -140,10 +143,12 @@ export async function startGateway() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        logFd.write(text).catch(() => {});
+        logFd.write(text).catch((err) => swallowError("gateway stderr log write", err));
         broadcastLog("[gateway] " + text);
       }
-    } catch {}
+    } catch (err) {
+      swallowError("gateway stderr reader", err);
+    }
   })();
   return { ok: true, message: "started", pid: gatewayProcess.pid };
 }
@@ -220,10 +225,12 @@ export async function startDashboard() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        Bun.write(logFile, text, { append: true }).catch(() => {});
+        Bun.write(logFile, text, { append: true }).catch((err) => swallowError("dashboard stdout log write", err));
         broadcastLog("[dashboard] " + text);
       }
-    } catch {}
+    } catch (err) {
+      swallowError("dashboard stdout reader", err);
+    }
   })();
   (async () => {
     const reader = dashboardProcess.stderr.getReader();
@@ -232,10 +239,12 @@ export async function startDashboard() {
         const { done, value } = await reader.read();
         if (done) break;
         const text = new TextDecoder().decode(value);
-        Bun.write(logFile, text, { append: true }).catch(() => {});
+        Bun.write(logFile, text, { append: true }).catch((err) => swallowError("dashboard stderr log write", err));
         broadcastLog("[dashboard] " + text);
       }
-    } catch {}
+    } catch (err) {
+      swallowError("dashboard stderr reader", err);
+    }
   })();
   return { ok: true, message: "started", pid: dashboardProcess.pid, port: DASHBOARD_PORT };
 }
@@ -254,7 +263,9 @@ export async function stopDashboard() {
   try {
     const stopProc = Bun.spawn([HERMES_BIN, "dashboard", "--stop"], { stdout: "pipe", stderr: "pipe" });
     await stopProc.exited;
-  } catch {}
+  } catch (err) {
+    swallowError("dashboard --stop", err);
+  }
   dashboardProcess = null;
   try { unlinkSync(DASHBOARD_PID_FILE); } catch {}
   return { ok: true, message: "stopped" };
@@ -266,7 +277,9 @@ function getPipIndexArgs() {
   try {
     const u = new URL(indexUrl);
     if (u.hostname) args.push("--trusted-host", u.hostname);
-  } catch {}
+  } catch (err) {
+    swallowError("parse PIP_INDEX_URL", err);
+  }
   return args;
 }
 
@@ -282,7 +295,9 @@ export async function installHermes(packageSpec) {
         const proc = Bun.spawn([py, "--version"], { stdout: "pipe", stderr: "pipe" });
         const exitCode2 = await proc.exited;
         if (exitCode2 === 0) { pythonBin = py; break; }
-      } catch {}
+      } catch (err) {
+        swallowError(`python probe ${py}`, err);
+      }
     }
     if (!pythonBin) { installInProgress = false; return { ok: false, error: "Python 3.10+ not found" }; }
     broadcastLog(`[install] Using ${pythonBin}\n`);
@@ -307,7 +322,9 @@ export async function installHermes(packageSpec) {
           if (done) break;
           broadcastLog(new TextDecoder().decode(value));
         }
-      } catch {}
+      } catch (err) {
+        swallowError("install stderr reader", err);
+      }
     })();
     const exitCode = await installProc.exited;
     if (exitCode !== 0) {
@@ -317,7 +334,9 @@ export async function installHermes(packageSpec) {
       if (ghExit !== 0) { installInProgress = false; return { ok: false, error: `pip install failed (exit ${exitCode}, github ${ghExit})` }; }
     }
     if (!existsSync(HERMES_BIN)) { installInProgress = false; return { ok: false, error: "hermes binary not found after install" }; }
-    try { chmodSync(HERMES_BIN, 493); } catch {}
+    try { chmodSync(HERMES_BIN, 493); } catch (err) {
+      swallowError("chmod hermes binary", err);
+    }
     broadcastLog("[install] Hermes installed successfully.\n");
     installInProgress = false;
     return { ok: true, message: "installed", bin: HERMES_BIN };

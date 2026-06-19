@@ -24,47 +24,53 @@ const MIME = {
   ".otf": "font/otf"
 };
 
-function isPathSafe(targetPath) {
-  // 必须位于 STATIC_DIR 下，且不含 NUL 字节
-  if (targetPath.includes("\0")) return false;
-  const resolved = resolve(targetPath);
-  return resolved === STATIC_DIR || resolved.startsWith(STATIC_DIR + sep);
+function fileResponse(filePath, contentType) {
+  // 兼容 Bun 与 Node.js 测试环境
+  if (typeof Bun !== "undefined" && Bun.file) {
+    return new Response(Bun.file(filePath), {
+      headers: { "Content-Type": contentType }
+    });
+  }
+  return new Response(readFileSync(filePath), {
+    headers: { "Content-Type": contentType }
+  });
 }
 
-export function serveStatic(pathname) {
-  // 去除可能的前导斜杠，统一基于 STATIC_DIR 解析
+function isPathSafe(targetPath, staticDir) {
+  // 必须位于 staticDir 下，且不含 NUL 字节
+  if (targetPath.includes("\0")) return false;
+  const resolved = resolve(targetPath);
+  return resolved === staticDir || resolved.startsWith(staticDir + sep);
+}
+
+export function serveStatic(pathname, staticDir = STATIC_DIR) {
+  // 去除可能的前导斜杠，统一基于 staticDir 解析
   const clean = pathname.replace(/^\/+/, "");
 
   // 根路径直接回退到 index.html（避免把 STATIC_DIR 目录当文件返回）
   if (clean === "") {
-    const fallback = join(STATIC_DIR, "index.html");
+    const fallback = join(staticDir, "index.html");
     if (existsSync(fallback)) {
-      return new Response(Bun.file(fallback), {
-        headers: { "Content-Type": "text/html" }
-      });
+      return fileResponse(fallback, "text/html");
     }
     return new Response("Not found", { status: 404 });
   }
 
-  const filePath = join(STATIC_DIR, clean);
+  const filePath = join(staticDir, clean);
 
   // 安全：目录穿越防护
-  if (!isPathSafe(filePath)) {
+  if (!isPathSafe(filePath, staticDir)) {
     return new Response("Forbidden", { status: 403 });
   }
 
   if (!existsSync(filePath)) {
-    const fallback = join(STATIC_DIR, "index.html");
+    const fallback = join(staticDir, "index.html");
     if (existsSync(fallback)) {
-      return new Response(Bun.file(fallback), {
-        headers: { "Content-Type": "text/html" }
-      });
+      return fileResponse(fallback, "text/html");
     }
     return new Response("Not found", { status: 404 });
   }
 
   const ext = extname(filePath).toLowerCase();
-  return new Response(Bun.file(filePath), {
-    headers: { "Content-Type": MIME[ext] || "application/octet-stream" }
-  });
+  return fileResponse(filePath, MIME[ext] || "application/octet-stream");
 }

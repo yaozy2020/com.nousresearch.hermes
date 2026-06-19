@@ -48,6 +48,18 @@ fi
 
 # 生产构建使用 fnOS 网关绝对路径，避免无尾斜杠访问时相对路径解析错误
 export VITE_BASE_PATH="/app/com-nousresearch-hermes/"
+
+# 校验前后端 API 类型定义是否同步（忽略注释、空白、分号差异）
+node "$PROJ_DIR/scripts/check-api-types.cjs" || exit 1
+
+# 运行单元测试（Bun 优先，否则 Node.js）
+echo "  运行单元测试 ..."
+if command -v bun >/dev/null 2>&1; then
+  cd "$PROJ_DIR" && bun test || exit 1
+else
+  cd "$PROJ_DIR" && npm test || exit 1
+fi
+
 if [ "$PKG_MANAGER" = "bun" ]; then
   BUILD_CMD="bun ./node_modules/vite/bin/vite.js build"
 else

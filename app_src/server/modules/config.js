@@ -1,6 +1,7 @@
 // @bun
 // 配置与消息频道管理（config.yaml / .env）
 import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
+import { swallowError } from "./error.js";
 
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
 const HERMES_HOME = process.env.HERMES_HOME || `${DATA_DIR}/home`;
@@ -15,7 +16,9 @@ function migrateConfigFile(name) {
   const src = `${LEGACY_CONFIG_DIR}/${name}`;
   const dst = `${CONFIG_DIR}/${name}`;
   if (existsSync(src) && !existsSync(dst)) {
-    try { copyFileSync(src, dst); } catch {}
+    try { copyFileSync(src, dst); } catch (err) {
+      swallowError(`migrate config ${name}`, err);
+    }
   }
 }
 migrateConfigFile("config.yaml");

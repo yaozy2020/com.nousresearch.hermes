@@ -5,7 +5,7 @@
 
 import { spawn } from "child_process";
 
-const ALLOWED_COMMANDS = new Map([
+export const ALLOWED_COMMANDS = new Map([
   ["setup", ["setup"]],
   ["model", ["model"]],
   ["login", ["login"]],
@@ -14,7 +14,42 @@ const ALLOWED_COMMANDS = new Map([
   ["status", ["status"]],
 ]);
 
-const SHELL_METACHARS_RE = /[;|&$`\\(){}<>\r\n]/;
+export const SHELL_METACHARS_RE = /[;|&$`\\(){}<>\r\n]/;
+
+export function validateCommand(args) {
+  if (!Array.isArray(args) || args.length === 0) {
+    return { ok: false, error: "交互式 shell 已禁用。请从面板选择允许的命令。" };
+  }
+
+  const raw = args.join(" ");
+  if (SHELL_METACHARS_RE.test(raw)) {
+    return { ok: false, error: `命令包含非法字符，已拒绝：${raw}` };
+  }
+
+  if (args[0] !== "hermes") {
+    return { ok: false, error: `只允许执行 hermes 命令，已拒绝：${args[0]}` };
+  }
+
+  const subArgs = args.slice(1);
+  const cmdKey = subArgs[0];
+
+  if (!ALLOWED_COMMANDS.has(cmdKey)) {
+    return { ok: false, error: `hermes ${cmdKey} 不在允许列表中。` };
+  }
+
+  const expected = ALLOWED_COMMANDS.get(cmdKey);
+  if (subArgs.length !== expected.length) {
+    return { ok: false, error: `命令参数不匹配。只允许：hermes ${expected.join(" ")}` };
+  }
+
+  for (let i = 0; i < expected.length; i++) {
+    if (subArgs[i] !== expected[i]) {
+      return { ok: false, error: `命令参数不匹配。只允许：hermes ${expected.join(" ")}` };
+    }
+  }
+
+  return { ok: true, command: ["hermes", ...expected] };
+}
 
 function printError(msg) {
   process.stderr.write(`\x1b[31m[hermes-shell] ${msg}\x1b[0m\r\n`);
@@ -23,51 +58,17 @@ function printError(msg) {
 
 function main() {
   const args = process.argv.slice(2);
-
-  if (args.length === 0) {
-    printError("交互式 shell 已禁用。请从面板选择允许的命令。");
+  const result = validateCommand(args);
+  if (!result.ok) {
+    printError(result.error);
     process.exit(1);
-  }
-
-  const raw = args.join(" ");
-
-  if (SHELL_METACHARS_RE.test(raw)) {
-    printError(`命令包含非法字符，已拒绝：${raw}`);
-    process.exit(1);
-  }
-
-  if (args[0] !== "hermes") {
-    printError(`只允许执行 hermes 命令，已拒绝：${args[0]}`);
-    process.exit(1);
-  }
-
-  const subArgs = args.slice(1);
-  const cmdKey = subArgs[0];
-
-  if (!ALLOWED_COMMANDS.has(cmdKey)) {
-    printError(`hermes ${cmdKey} 不在允许列表中。`);
-    process.exit(1);
-  }
-
-  const expected = ALLOWED_COMMANDS.get(cmdKey);
-
-  if (subArgs.length !== expected.length) {
-    printError(`命令参数不匹配。只允许：hermes ${expected.join(" ")}`);
-    process.exit(1);
-  }
-
-  for (let i = 0; i < expected.length; i++) {
-    if (subArgs[i] !== expected[i]) {
-      printError(`命令参数不匹配。只允许：hermes ${expected.join(" ")}`);
-      process.exit(1);
-    }
   }
 
   const hermesBin = process.env.HERMES_BIN || "hermes";
   const cwd = process.env.HERMES_DATA_DIR || process.cwd();
 
   // 使用 spawn + detached 创建新进程组，便于 SIGINT 转发
-  const child = spawn(hermesBin, expected, {
+  const child = spawn(hermesBin, result.command.slice(1), {
     stdio: "inherit",
     env: process.env,
     cwd,
@@ -95,4 +96,6 @@ function main() {
   });
 }
 
-main();
+if (import.meta.main || (process.argv[1] && process.argv[1].endsWith("terminal-shell.js"))) {
+  main();
+}
