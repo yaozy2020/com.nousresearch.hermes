@@ -238,13 +238,13 @@ onUnmounted(() => {
           <div v-if="gateway" class="flex items-center gap-3">
             <UBadge :color="gateway.running ? 'success' : 'neutral'" variant="soft" size="md">
               <template #leading>
-                <UIcon :name="gateway.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+                <UIcon :name="gateway.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="gateway.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
               </template>
               {{ gateway.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span class="text-xs text-[var(--ui-text-muted)]">
+            <span v-if="gateway.running" class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
-              <span class="ml-2">已运行 {{ gateway.uptime || '-' }}</span>
+              <span v-if="gateway.uptime" class="ml-2">已运行 {{ gateway.uptime }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -267,13 +267,13 @@ onUnmounted(() => {
           <div v-if="dashboard" class="flex items-center gap-3">
             <UBadge :color="dashboard.running ? 'success' : 'neutral'" variant="soft" size="md">
               <template #leading>
-                <UIcon :name="dashboard.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+                <UIcon :name="dashboard.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="dashboard.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
               </template>
               {{ dashboard.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span class="text-xs text-[var(--ui-text-muted)]">
+            <span v-if="dashboard.running" class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
-              <span class="ml-2">已运行 {{ dashboard.uptime || '-' }}</span>
+              <span v-if="dashboard.uptime" class="ml-2">已运行 {{ dashboard.uptime }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -296,13 +296,13 @@ onUnmounted(() => {
           <div v-if="terminal" class="flex items-center gap-3">
             <UBadge :color="terminal.running ? 'success' : 'neutral'" variant="soft" size="md">
               <template #leading>
-                <UIcon :name="terminal.running ? 'i-lucide-activity' : 'i-lucide-stop-circle'" class="w-4 h-4" />
+                <UIcon :name="terminal.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="terminal.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
               </template>
               {{ terminal.running ? '运行中' : '未运行' }}
             </UBadge>
-            <span class="text-xs text-[var(--ui-text-muted)]">
+            <span v-if="terminal.running" class="text-xs text-[var(--ui-text-muted)]">
               PID <span class="font-mono text-[var(--ui-text)]">{{ terminal.pid || '-' }}</span>
-              <span class="ml-2">已运行 {{ terminal.uptime || '-' }}</span>
+              <span v-if="terminal.uptime" class="ml-2">已运行 {{ terminal.uptime }}</span>
             </span>
           </div>
           <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
@@ -346,3 +346,14 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style scoped>
+.heartbeat {
+  animation: heartbeat 1.4s ease-in-out infinite;
+}
+
+@keyframes heartbeat {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.15); }
+}
+</style>
