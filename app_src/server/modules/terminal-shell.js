@@ -1,9 +1,9 @@
 #!/usr/bin/env bun
 // @bun
 // 受限终端命令包装器 —— 仅允许执行白名单 hermes 子命令
-// 由 ttyd 启动本脚本，本脚本再 exec 到真正的 hermes 命令
+// 由 ttyd 启动本脚本，本脚本再启动真正的 hermes 命令
 
-import { spawnSync } from "child_process";
+import { spawn } from "child_process";
 
 const ALLOWED_COMMANDS = new Map([
   ["setup", ["setup"]],
@@ -66,14 +66,33 @@ function main() {
   const hermesBin = process.env.HERMES_BIN || "hermes";
   const cwd = process.env.HERMES_DATA_DIR || process.cwd();
 
-  const result = spawnSync(hermesBin, expected, {
+  // 使用 spawn + detached 创建新进程组，便于 SIGINT 转发
+  const child = spawn(hermesBin, expected, {
     stdio: "inherit",
     env: process.env,
     cwd,
     shell: false,
+    detached: true,
   });
 
-  process.exit(result.status ?? 1);
+  // 转发 SIGINT/SIGTERM 给子进程，让 Ctrl+C 能中断 hermes
+  function forwardSignal(sig) {
+    try {
+      process.kill(-child.pid, sig);
+    } catch {}
+  }
+
+  process.on("SIGINT", () => forwardSignal("SIGINT"));
+  process.on("SIGTERM", () => forwardSignal("SIGTERM"));
+
+  child.on("exit", (code) => {
+    process.exit(code ?? 0);
+  });
+
+  child.on("error", (err) => {
+    printError(`启动失败：${err.message}`);
+    process.exit(1);
+  });
 }
 
 main();
