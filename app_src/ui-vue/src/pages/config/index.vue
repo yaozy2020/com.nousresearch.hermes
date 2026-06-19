@@ -97,7 +97,7 @@ onMounted(loadConfig)
     </div>
 
     <UAlert color="info" variant="soft" icon="i-lucide-info" title="提示"
-      description="推荐使用官方 Dashboard 配置 Provider 和 Channel，本页适合手动调整边缘参数。Dashboard 默认仅监听 127.0.0.1，如需直接通过浏览器访问，请在 .env 中添加 HERMES_DASHBOARD_INSECURE=1 并重启应用。">
+      description="推荐使用官方 Dashboard 配置 Provider 和 Channel，本页适合手动调整边缘参数。默认允许局域网直接访问 Dashboard；如需锁回仅本地访问，请在 .env 中设置 HERMES_DASHBOARD_INSECURE=0 并重启应用。">
       <template #actions>
         <UButton color="primary" size="sm" @click="openDashboard">打开 Dashboard</UButton>
       </template>
@@ -119,17 +119,18 @@ onMounted(loadConfig)
           <p class="text-xs text-[var(--ui-text-muted)] mt-1">
             安全提示：API Key / Token 等敏感值已脱敏显示为 __MASKED__，未修改时不会覆盖原值。
           </p>
-          <UAlert class="mt-3" color="warning" variant="soft" icon="i-lucide-shield-alert" title="开启 Dashboard 外部访问（不安全模式）">
+          <UAlert class="mt-3" color="warning" variant="soft" icon="i-lucide-shield-alert" title="Dashboard 访问模式">
             <template #description>
               <div class="space-y-1 text-xs">
-                <p>默认 Dashboard 仅监听 127.0.0.1。如需浏览器直接访问 <code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">http://nas:9119</code>，请执行以下步骤：</p>
+                <p>默认情况下 Dashboard 监听 <code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">0.0.0.0:9119</code>，允许局域网直接访问 <code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">http://nas:9119</code>。</p>
+                <p>如需恢复仅本地访问（更安全）：</p>
                 <ol class="list-decimal list-inside space-y-0.5">
-                  <li>在本页 .env 末尾添加：<code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">HERMES_DASHBOARD_INSECURE=1</code></li>
+                  <li>在本页 .env 中添加或修改：<code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">HERMES_DASHBOARD_INSECURE=0</code></li>
                   <li>点「保存」</li>
                   <li>到 fnOS 应用中心停止并重新启动 Hermes 应用</li>
-                  <li>回到面板，Dashboard 状态会变为「外部访问模式」</li>
+                  <li>回到面板，Dashboard 状态会变为「本地安全模式」</li>
                 </ol>
-                <p class="text-[var(--ui-text-muted)]">注意：开启后 Dashboard 将无认证暴露在局域网，公网/多用户环境请勿启用。</p>
+                <p class="text-[var(--ui-text-muted)]">注意：局域网无认证暴露意味着同一网络内任何人都能访问 Dashboard；公网/多用户环境建议保持本地模式。</p>
               </div>
             </template>
           </UAlert>

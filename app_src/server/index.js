@@ -127,7 +127,7 @@ async function handleRequest(req) {
         ttydPid: getTtydPid(),
         ttydUptime: getTtydUptime(),
         ttydPort: getTtydPort(),
-        dashboardInsecure: process.env.HERMES_DASHBOARD_INSECURE === "1",
+        dashboardInsecure: process.env.HERMES_DASHBOARD_INSECURE !== "0",
         version: await getVersion()
       });
     }
@@ -196,7 +196,7 @@ async function handleRequest(req) {
       return json(result, result.ok ? 200 : 500);
     }
     if (pathname === "/api/dashboard/status" && method === "GET") {
-      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT, insecure: process.env.HERMES_DASHBOARD_INSECURE === "1" });
+      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT, insecure: process.env.HERMES_DASHBOARD_INSECURE !== "0" });
     }
     if (pathname === "/api/dashboard/start" && method === "POST") {
       const result = await startDashboard();

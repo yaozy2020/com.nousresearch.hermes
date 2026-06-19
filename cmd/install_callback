@@ -122,9 +122,10 @@ YAML
 # API keys and secrets stored here
 ENV
     fi
-    # 去重写入端口与 pip 源
-    grep -v -e '^HERMES_DASHBOARD_PORT=' -e '^PIP_INDEX_URL=' "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp" 2>/dev/null || cat "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp"
+    # 去重写入端口、不安全模式（默认允许局域网访问）与 pip 源
+    grep -v -e '^HERMES_DASHBOARD_PORT=' -e '^HERMES_DASHBOARD_INSECURE=' -e '^PIP_INDEX_URL=' "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp" 2>/dev/null || cat "${CFG_TARGET}/.env" > "${CFG_TARGET}/.env.tmp"
     printf '\nHERMES_DASHBOARD_PORT=%s\n' "${DASHBOARD_PORT}" >> "${CFG_TARGET}/.env.tmp"
+    printf 'HERMES_DASHBOARD_INSECURE=1\n' >> "${CFG_TARGET}/.env.tmp"
     printf 'PIP_INDEX_URL=%s\n' "${PIP_INDEX_URL}" >> "${CFG_TARGET}/.env.tmp"
     mv -f "${CFG_TARGET}/.env.tmp" "${CFG_TARGET}/.env"
     chmod 640 "${CFG_TARGET}/.env" 2>/dev/null || true

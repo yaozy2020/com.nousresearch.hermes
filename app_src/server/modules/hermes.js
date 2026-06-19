@@ -196,12 +196,9 @@ export async function startDashboard() {
     HERMES_HOME: `${DATA_DIR}/home`,
     HOME: `${DATA_DIR}/home`
   };
-  // 安全：Dashboard 在 non-loopback 绑定下强制要求 OAuth provider；
-  // 内网 NAS 无 provider 时，默认绑定 127.0.0.1 并通过面板反向代理访问，
-  // 避免直接暴露无认证 Dashboard 到网络。
-  const dashboardInsecure = process.env.HERMES_DASHBOARD_INSECURE === "1";
-  // 默认安全模式绑定 127.0.0.1；显式开启不安全模式后默认监听 0.0.0.0，
-  // 用户仍可通过 HERMES_DASHBOARD_HOST 覆盖。
+  // 部署在 NAS 等家庭内网场景下，默认允许局域网直接访问 Dashboard；
+  // 如需锁回仅本地访问，设置 HERMES_DASHBOARD_INSECURE=0 并重启。
+  const dashboardInsecure = process.env.HERMES_DASHBOARD_INSECURE !== "0";
   const dashboardHost = process.env.HERMES_DASHBOARD_HOST || (dashboardInsecure ? "0.0.0.0" : "127.0.0.1");
   if (await isPortInUse(DASHBOARD_PORT, dashboardHost)) {
     return { ok: false, error: `端口 ${DASHBOARD_PORT} 已被占用，请修改 HERMES_DASHBOARD_PORT 后重试` };

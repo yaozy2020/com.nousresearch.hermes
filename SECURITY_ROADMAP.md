@@ -23,7 +23,7 @@
 |:---|:----:|:---------|
 | Web 终端沙箱化 | ✅ | `terminal-shell.js` 白名单 + 元字符拦截 |
 | 敏感配置脱敏 | ✅ | 后端返回 `__MASKED__`，保存时未修改保留原值 |
-| Dashboard 安全模式 | ✅ | 默认绑定 `127.0.0.1`，`HERMES_DASHBOARD_INSECURE=1` 显式开放 |
+| Dashboard 访问模式 | ✅ | 默认绑定 `0.0.0.0` 允许局域网访问；`HERMES_DASHBOARD_INSECURE=0` 可锁回仅本地 |
 | 静态文件路径安全 | ✅ | `path.resolve` + `startsWith(STATIC_DIR)` 目录穿越防护 |
 | API 来源校验（初版） | ✅ | 写操作增加 Origin/Referer 校验 |
 
