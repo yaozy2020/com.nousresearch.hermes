@@ -65,6 +65,9 @@ fi
 echo "  安装前端依赖（$PKG_MANAGER）..."
 $INSTALL_CMD
 
+# 清理旧 dist，避免 public 里已删除的文件残留到产物
+rm -rf "$APP_SRC/ui-vue/dist"
+
 echo "  构建生产包 ..."
 $BUILD_CMD
 

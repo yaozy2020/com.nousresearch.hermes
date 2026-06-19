@@ -1,6 +1,6 @@
 // @bun
 // app_src/server/index.js — Hermes 面板入口（模块化后）
-import { existsSync, chmodSync } from "fs";
+import { existsSync, chmodSync, readFileSync } from "fs";
 import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel } from "./modules/config.js";
 import { wsClients, readLogs, log } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
@@ -11,7 +11,7 @@ import {
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard,
   installHermes, restartHermesAll
 } from "./modules/hermes.js";
-import { isTtydAlive, getTtydPid, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
+import { isTtydAlive, getTtydPid, getTtydPort, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
 process.on("uncaughtException", (err) => log("error", "uncaughtException", err));
 process.on("unhandledRejection", (reason) => log("error", "unhandledRejection", reason));
@@ -22,7 +22,6 @@ const SOCKET_PATH = process.env.SOCKET_PATH || "/tmp/hermes.sock";
 const VENV_DIR = process.env.HERMES_VENV || `${DATA_DIR}/venv`;
 const HERMES_BIN = process.env.HERMES_BIN || `${VENV_DIR}/bin/hermes`;
 const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
-const TERM_PORT = parseInt(process.env.HERMES_TERM_PORT || "9123");
 const BIN_DIR = process.env.HERMES_PANEL_BIN || (process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/bin` : "./bin");
 const TTYD_BIN = `${BIN_DIR}/ttyd`;
 
@@ -42,7 +41,7 @@ async function proxyTerminalHttp(req, pathname) {
     return new Response("Terminal not started. POST /api/terminal/start first.", { status: 503 });
   }
   const url = new URL(req.url);
-  const suffix = pathname.replace(/^\/terminal/, "") || "/";
+  const suffix = pathname.replace(/^\/ttyd/, "") || "/";
   const targetUrl = getTtydTargetUrl(suffix + (url.search || ""));
   if (!targetUrl) {
     return new Response("Terminal unavailable", { status: 503 });
@@ -51,7 +50,7 @@ async function proxyTerminalHttp(req, pathname) {
   try {
     const headers = new Headers(req.headers);
     headers.delete("host");
-    headers.set("host", `127.0.0.1:${TERM_PORT}`);
+    headers.set("host", `127.0.0.1:${getTtydPort()}`);
     const res = await fetch(targetUrl, {
       method: req.method,
       headers,
@@ -59,12 +58,22 @@ async function proxyTerminalHttp(req, pathname) {
       redirect: "manual"
     });
     const resHeaders = new Headers(res.headers);
-    // 重写 location，避免客户端跳到 127.0.0.1:9123
+    // 重写 location，避免客户端跳到 127.0.0.1:<ttyd-port>
     const location = resHeaders.get("location");
-    if (location && location.includes(`127.0.0.1:${TERM_PORT}`)) {
+    if (location) {
+      const ttydPort = getTtydPort();
       const proto = req.headers.get("x-forwarded-proto") === "https" ? "https" : "http";
       const host = req.headers.get("host") || "localhost";
-      resHeaders.set("location", location.replace(`http://127.0.0.1:${TERM_PORT}`, `${proto}://${host}`));
+      // ttyd 返回的 location 形如 http://127.0.0.1:9123/ttyd/...，需要替换为网关前缀路径
+      const localBase = `http://127.0.0.1:${ttydPort}`;
+      if (location.toLowerCase().startsWith(localBase.toLowerCase())) {
+        const publicBase = `${proto}://${host}`;
+        resHeaders.set("location", location.replace(localBase, publicBase));
+      } else if (location === "/ttyd/" || location.startsWith("/ttyd/")) {
+        // 相对路径或绝对路径 /ttyd/...，补上网关前缀
+        const gatewayPrefix = url.pathname.replace(/\/?ttyd\/?$/, "") || "";
+        resHeaders.set("location", gatewayPrefix + location);
+      }
     }
     return new Response(res.body, { status: res.status, statusText: res.statusText, headers: resHeaders });
   } catch (err) {
@@ -188,7 +197,7 @@ async function handleRequest(req) {
       return json({
         running: isTtydAlive(),
         pid: getTtydPid(),
-        port: TERM_PORT,
+        port: getTtydPort(),
         ttyd_available: existsSync(TTYD_BIN),
         commands: Object.keys(TERM_COMMANDS)
       });
@@ -204,12 +213,22 @@ async function handleRequest(req) {
       const result = await stopTtyd();
       return json(result);
     }
+    if (pathname === "/api/terminal/ttyd_log" && method === "GET") {
+      const logFile = `${DATA_DIR}/runtime/ttyd.log`;
+      const content = existsSync(logFile) ? readFileSync(logFile, "utf-8") : "";
+      return new Response(content, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
+    if (pathname === "/api/terminal/server_log" && method === "GET") {
+      const logFile = `${DATA_DIR}/logs/gateway.log`;
+      const content = existsSync(logFile) ? readFileSync(logFile, "utf-8") : "";
+      return new Response(content, { headers: { "Content-Type": "text/plain; charset=utf-8" } });
+    }
     return json({ error: "not found" }, 404);
   }
 
-  // ── /terminal-mobile 移动端终端外壳 ──
-  if (pathname === "/terminal-mobile" || pathname.startsWith("/terminal-mobile/")) {
-    return serveStatic("/terminal-mobile.html");
+  // ── /ttyd-mobile 移动端终端外壳 ──
+  if (pathname === "/ttyd-mobile" || pathname.startsWith("/ttyd-mobile/")) {
+    return serveStatic("/ttyd-mobile.html");
   }
 
   return serveStatic(pathname);
@@ -226,14 +245,21 @@ const server = Bun.serve({
         if (srv.upgrade(req, { data: { type: "logs" } })) return;
       }
 
-      // ── /terminal/* 反代到 ttyd（HTTP + WebSocket） ──
-      if (pathname === "/terminal" || pathname.startsWith("/terminal/")) {
+      // ── /ttyd/* 反代到 ttyd（HTTP + WebSocket） ──
+      if (pathname === "/ttyd" || pathname.startsWith("/ttyd/")) {
         if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
-          const suffix = pathname.replace(/^\/terminal/, "") || "/";
+          const suffix = pathname.replace(/^\/ttyd/, "") || "/";
           const targetHttp = getTtydTargetUrl(suffix + url.search);
           if (!targetHttp) return new Response("Terminal unavailable", { status: 503 });
           const backendUrl = targetHttp.replace(/^http/, "ws");
-          if (srv.upgrade(req, { data: { type: "terminal", backendUrl } })) return;
+          const upgradeOpts = { data: { type: "terminal", backendUrl } };
+          const protocols = req.headers.get("sec-websocket-protocol");
+          if (protocols) {
+            const chosen = protocols.split(",").map((s) => s.trim()).find((p) => p === "tty") || protocols.split(",")[0].trim();
+            upgradeOpts.headers = { "Sec-WebSocket-Protocol": chosen };
+          }
+          log("info", "terminal ws upgrade", pathname, "->", backendUrl, "protocols:", protocols || "none");
+          if (srv.upgrade(req, upgradeOpts)) return;
           return new Response("Terminal upgrade failed", { status: 500 });
         }
         return await proxyTerminalHttp(req, pathname);
@@ -251,16 +277,22 @@ const server = Bun.serve({
         const backendUrl = ws.data.backendUrl;
         if (!backendUrl) { ws.close(); return; }
         try {
-          const backend = new WebSocket(backendUrl);
+          log("info", "connecting backend ws", backendUrl);
+          const backend = new WebSocket(backendUrl, ["tty"]);
           backend.binaryType = "arraybuffer";
           terminalProxies.set(ws, backend);
+          backend.onopen = () => {
+            log("info", "backend ws open", backendUrl);
+          };
           backend.onmessage = (event) => {
             try { ws.send(event.data); } catch {}
           };
-          backend.onclose = () => {
+          backend.onclose = (e) => {
+            log("info", "backend ws close", e?.code, e?.reason);
             try { ws.close(); } catch {}
           };
-          backend.onerror = () => {
+          backend.onerror = (e) => {
+            log("error", "backend ws error", e?.message || e);
             try { ws.close(); } catch {}
           };
           ws.onclose = () => {
@@ -278,9 +310,14 @@ const server = Bun.serve({
     },
     message(ws, msg) {
       if (ws.data?.type === "terminal") {
+        log("info", "terminal ws msg from client, type:", typeof msg, "size:", msg?.length || msg?.byteLength || 0);
         const backend = terminalProxies.get(ws);
-        if (backend && backend.readyState === WebSocket.OPEN) {
-          try { backend.send(msg); } catch {}
+        if (backend) {
+          if (backend.readyState === WebSocket.OPEN) {
+            try { backend.send(msg); } catch {}
+          } else {
+            log("warn", "backend ws not open, state:", backend.readyState);
+          }
         }
         return;
       }

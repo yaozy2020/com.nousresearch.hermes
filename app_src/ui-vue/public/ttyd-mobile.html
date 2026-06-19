@@ -129,6 +129,14 @@
       border: 1px solid #30363d;
     }
     #toast.show { opacity: 1; }
+    #debug {
+      position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      background: rgba(22, 27, 34, 0.96); color: #f85149;
+      padding: 16px; border-radius: 12px; border: 1px solid #f85149;
+      max-width: 86%; font-size: 12px; line-height: 1.5;
+      z-index: 200; display: none; white-space: pre-wrap;
+    }
+    #debug.show { display: block; }
     .hidden { display: none !important; }
   </style>
 </head>
@@ -149,7 +157,7 @@
       </div>
     </header>
     <div id="frame-wrap">
-      <iframe id="term-frame" sandbox="allow-scripts allow-same-origin allow-forms" class="hidden"></iframe>
+      <iframe id="term-frame" class="hidden"></iframe>
       <div id="overlay">
         <div class="spinner"></div>
         <div class="msg" id="overlay-msg">正在连接 ttyd 终端…</div>
@@ -170,6 +178,7 @@
     </footer>
   </div>
   <div id="toast"></div>
+  <div id="debug"></div>
   <script>
     (function() {
       const params = new URLSearchParams(location.search);
@@ -180,7 +189,17 @@
       const statusMeta = document.getElementById('status-meta');
       const cmdTitle = document.getElementById('cmd-title');
       const toastEl = document.getElementById('toast');
+      const debugEl = document.getElementById('debug');
       let started = false;
+
+      function setDebug(msg) {
+        debugEl.textContent = msg;
+        debugEl.classList.add('show');
+      }
+      function appendDebug(msg) {
+        debugEl.textContent += (debugEl.textContent ? '\n' : '') + msg;
+        debugEl.classList.add('show');
+      }
 
       const CMD_LABELS = {
         setup: 'hermes setup',
@@ -191,6 +210,12 @@
         status: 'hermes status'
       };
       cmdTitle.textContent = CMD_LABELS[cmd] || `hermes ${cmd}`;
+
+      // 兼容 fnOS 应用网关前缀：/app/com-nousresearch-hermes/ttyd-mobile
+      // 相对路径能自动带上网关前缀
+      const API_START = './api/terminal/start';
+      const API_STOP = './api/terminal/stop';
+      const TTYD_PATH = './ttyd/';
 
       function showToast(msg) {
         toastEl.textContent = msg;
@@ -206,7 +231,7 @@
 
       async function start() {
         try {
-          const res = await fetch('/api/terminal/start', {
+          const res = await fetch(API_START, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ cmd, mobile: true })
@@ -219,23 +244,105 @@
           }
           started = true;
           statusMeta.textContent = `PID ${data.pid} · ${data.args ? data.args.join(' ') : ''}`;
-          frame.src = '/terminal';
+          frame.src = TTYD_PATH;
           frame.classList.remove('hidden');
           overlay.classList.add('hidden');
           showToast('终端已启动，点击终端区域唤起键盘');
+          frame.onload = () => {
+            appendDebug('iframe loaded: ' + frame.src);
+            try {
+              const doc = frame.contentDocument;
+              if (doc && doc.body) {
+                const s = doc.createElement('script');
+                s.textContent = `
+                  window.onerror = function(msg, url, line, col, err) {
+                    parent.postMessage({type:'iframe-error', msg:String(msg), url:url, line:line, col:col, stack: err && err.stack ? String(err.stack) : ''}, '*');
+                    return false;
+                  };
+                  ['log','warn','error','info'].forEach(function(level){
+                    var orig = console[level];
+                    console[level] = function(){
+                      var args = Array.prototype.slice.call(arguments);
+                      parent.postMessage({type:'iframe-console', level:level, msg:args.map(function(a){return String(a);}).join(' ')}, '*');
+                      if(orig) orig.apply(console, arguments);
+                    };
+                  });
+                `;
+                doc.body.appendChild(s);
+                appendDebug('iframe logger injected');
+              }
+            } catch (e) {
+              appendDebug('inject iframe logger error: ' + e.message);
+            }
+          };
+          frame.onerror = (e) => { appendDebug('iframe error: ' + JSON.stringify(e)); };
+          window.addEventListener('message', (e) => {
+            if (e.data && (e.data.type === 'iframe-error' || e.data.type === 'iframe-console')) {
+              appendDebug('iframe ' + e.data.type + ': ' + JSON.stringify(e.data));
+            }
+          });
+          setTimeout(() => {
+            try {
+              const loc = frame.contentWindow.location;
+              appendDebug('iframe loc: ' + loc.href + ' ' + loc.pathname);
+            } catch (err) {
+              appendDebug('iframe loc inaccessible: ' + err.message);
+            }
+          }, 2000);
+          setTimeout(testConnections, 1500);
         } catch (e) {
           setOverlay(`启动失败：${e.message || '网络错误'}`, true);
           statusMeta.textContent = '启动失败';
         }
       }
 
+      async function testConnections() {
+        try {
+          const statusRes = await fetch('./api/terminal/status');
+          const status = await statusRes.json().catch(() => ({}));
+          appendDebug(`server status: running=${status.running} pid=${status.pid} port=${status.port}`);
+        } catch (e) {
+          appendDebug(`server status error: ${e.message}`);
+        }
+
+        const ttydUrl = new URL(TTYD_PATH, location.href);
+        const wsProto = ttydUrl.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${wsProto}//${ttydUrl.host}${ttydUrl.pathname.replace(/\/+$/, '')}/ws`;
+        appendDebug(`testing ws: ${wsUrl}`);
+        try {
+          const ws = new WebSocket(wsUrl, ['tty']);
+          ws.onopen = () => { appendDebug('ws test: OPEN'); ws.close(); };
+          ws.onmessage = (e) => { appendDebug(`ws test msg: ${e.data}`); };
+          ws.onerror = (e) => { appendDebug(`ws test: ERROR`); };
+          ws.onclose = (e) => { appendDebug(`ws test: CLOSE code=${e.code} reason=${e.reason || 'none'}`); };
+        } catch (e) {
+          appendDebug(`ws test exception: ${e.message}`);
+        }
+        try {
+          const logRes = await fetch('./api/terminal/ttyd_log');
+          const logText = await logRes.text();
+          const tail = logText.split('\n').slice(-20).join('\n');
+          appendDebug(`ttyd log tail:\n${tail || '(empty)'}`);
+        } catch (e) {
+          appendDebug(`ttyd log error: ${e.message}`);
+        }
+        try {
+          const svrRes = await fetch('./api/terminal/server_log');
+          const svrText = await svrRes.text();
+          const tail = svrText.split('\n').slice(-30).join('\n');
+          appendDebug(`server log tail:\n${tail || '(empty)'}`);
+        } catch (e) {
+          appendDebug(`server log error: ${e.message}`);
+        }
+      }
+
       async function stop() {
         try {
-          await fetch('/api/terminal/stop', { method: 'POST' });
+          await fetch(API_STOP, { method: 'POST' });
           showToast('终端已关闭');
         } catch {}
         if (window.history.length > 1) window.history.back();
-        else window.location.href = '/';
+        else window.location.href = './';
       }
 
       document.getElementById('btn-close').addEventListener('click', stop);
@@ -307,7 +414,7 @@
       });
 
       window.addEventListener('beforeunload', () => {
-        if (started) fetch('/api/terminal/stop', { method: 'POST', keepalive: true }).catch(() => {});
+        if (started) fetch(API_STOP, { method: 'POST', keepalive: true }).catch(() => {});
       });
 
       start();

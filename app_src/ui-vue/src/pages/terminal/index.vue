@@ -68,9 +68,9 @@ async function startTerminal(cmd: string) {
     lastStart.value = r
     notify('终端已启动', 'success')
     if (mobile) {
-      window.location.href = `/terminal-mobile?cmd=${encodeURIComponent(cmd)}`
+      window.location.href = `./ttyd-mobile?cmd=${encodeURIComponent(cmd)}`
     } else {
-      openInTab()
+      openInTab(cmd)
     }
   } catch (e: unknown) {
     const err = e as Error
@@ -94,8 +94,28 @@ async function stopTerminal() {
   }
 }
 
-function openInTab() {
-  window.open('/terminal', '_blank', 'noopener')
+async function openInTab(cmd: string) {
+  loading.value = true
+  try {
+    const r = await api<TerminalStartResponse>('api/terminal/start', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cmd, mobile: false }),
+    })
+    if (!r.ok) {
+      notify('启动失败: ' + (r.error || '未知错误'), 'error')
+      return
+    }
+    lastStart.value = r
+    notify('终端已启动', 'success')
+    window.open('./ttyd/', '_blank', 'noopener')
+  } catch (e: unknown) {
+    const err = e as Error
+    notify('启动失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    loading.value = false
+    refreshStatus()
+  }
 }
 
 onMounted(refreshStatus)
