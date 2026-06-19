@@ -7,7 +7,8 @@ import { resolve } from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const basePath = env.VITE_BASE_PATH || './'
+  // 生产环境使用 fnOS 网关绝对路径，避免无尾斜杠访问时相对路径解析错误
+  const basePath = env.VITE_BASE_PATH || (mode === 'production' ? '/app/com-nousresearch-hermes/' : './')
 
   return {
     plugins: [
