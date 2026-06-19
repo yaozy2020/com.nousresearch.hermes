@@ -47,6 +47,23 @@ describe("security / CSRF", () => {
     assert.strictEqual(isSafeWriteRequest(req), false);
   });
 
+  it("allows same host with different ports", () => {
+    const req = {
+      method: "POST",
+      url: "http://localhost/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "192.168.10.236",
+            origin: "http://192.168.10.236:5666"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), true);
+  });
+
   it("prefers Host header over req.url when checking origin", () => {
     const req = {
       method: "POST",

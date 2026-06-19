@@ -1,21 +1,36 @@
 // @bun
 // CSRF / 来源校验工具
 
+function bareHost(host) {
+  if (!host) return "";
+  return host.toLowerCase().split(":")[0];
+}
+
 export function getTrustedHosts(reqHost) {
   const trusted = new Set();
-  if (reqHost) trusted.add(reqHost.toLowerCase());
+  if (reqHost) {
+    trusted.add(reqHost.toLowerCase());
+    trusted.add(bareHost(reqHost));
+  }
   const env = process.env.HERMES_TRUSTED_HOSTS || "";
   for (const h of env.split(",")) {
     const host = h.trim();
-    if (host) trusted.add(host.toLowerCase());
+    if (host) {
+      trusted.add(host.toLowerCase());
+      trusted.add(bareHost(host));
+    }
   }
   return trusted;
 }
 
 function isLocalhost(host) {
-  if (!host) return false;
-  const h = host.toLowerCase().split(":")[0];
+  const h = bareHost(host);
   return h === "localhost" || h === "127.0.0.1" || h === "::1";
+}
+
+function isPrivateIPv4(host) {
+  const h = bareHost(host);
+  return /^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(h);
 }
 
 export function isSafeWriteRequest(req) {
@@ -29,7 +44,7 @@ export function isSafeWriteRequest(req) {
   if (origin === "null") return true;
 
   // 优先使用 Host 头部作为请求主机；Unix socket 场景 req.url 可能为 localhost
-  let reqHost = null;
+  let reqHost = "";
   try {
     const hostHeader = req.headers.get("host");
     if (hostHeader) {
@@ -41,14 +56,10 @@ export function isSafeWriteRequest(req) {
 
   const trustedHosts = getTrustedHosts(reqHost);
 
-  // 若 Host 是 localhost 且 Origin/Referer 来自内网 IP，也放行（fnOS gateway 常见场景）
   function isTrusted(headerHost) {
-    if (trustedHosts.has(headerHost)) return true;
-    if (isLocalhost(reqHost)) {
-      const bare = headerHost.split(":")[0];
-      // 内网 IPv4
-      if (/^(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(bare)) return true;
-    }
+    if (trustedHosts.has(headerHost) || trustedHosts.has(bareHost(headerHost))) return true;
+    // fnOS gateway 常见场景：Host 为 localhost，但 Origin/Referer 是内网 NAS IP（任意端口）
+    if (isLocalhost(reqHost) && isPrivateIPv4(headerHost)) return true;
     return false;
   }
 
