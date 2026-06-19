@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.25.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.2)
+[![Version](https://img.shields.io/badge/version-0.25.4-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.4)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,16 @@ bash build.sh
 
 ## 版本历史
 
-### v0.25.2（当前版本）
+### v0.25.4（当前版本）
+
+- **状态总览 Terminal 卡片增加停止按钮**：可直接在首页停止 ttyd 终端进程
+- **配置页增加 Dashboard 不安全模式步骤提示**：在 `.env` 编辑框下方直接展示开启外部访问的 4 步操作
+
+### v0.25.3
+
+- 同步 README 与面板提示文案，明确 Dashboard 不安全模式开启步骤
+
+### v0.25.2
 
 安全加固与稳定性改进：
 
