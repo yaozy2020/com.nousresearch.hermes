@@ -2,7 +2,7 @@
     ".url": {
         "com.nousresearch.hermes.Application": {
             "title": "Hermes AI 助手",
-            "icon": "images/icon.PNG",
+            "icon": "images/icon_{0}.png",
             "type": "iframe",
             "protocol": "http",
             "port": "",

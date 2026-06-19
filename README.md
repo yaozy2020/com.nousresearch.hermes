@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.2)
+[![Version](https://img.shields.io/badge/version-0.26.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.3)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,11 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.2（当前版本）
+### v0.26.3（当前版本）
+
+修复桌面端图标显示：在 `app/ui/images/` 补齐 `icon_64.png` / `icon_256.png`，并将 `app/ui/config` 图标路径改为 `images/icon_{0}.png`（与 QwenPaw 一致）。
+
+### v0.26.2
 
 卸载向导默认值回退为保留：保留配置 / 保留运行环境开关默认勾选，避免用户误卸载损失数据；仍可通过手动关闭开关实现彻底删除。
 
