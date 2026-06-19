@@ -34,7 +34,19 @@ function isPathSafe(targetPath) {
 export function serveStatic(pathname) {
   // 去除可能的前导斜杠，统一基于 STATIC_DIR 解析
   const clean = pathname.replace(/^\/+/, "");
-  const filePath = clean === "" ? STATIC_DIR : join(STATIC_DIR, clean);
+
+  // 根路径直接回退到 index.html（避免把 STATIC_DIR 目录当文件返回）
+  if (clean === "") {
+    const fallback = join(STATIC_DIR, "index.html");
+    if (existsSync(fallback)) {
+      return new Response(Bun.file(fallback), {
+        headers: { "Content-Type": "text/html" }
+      });
+    }
+    return new Response("Not found", { status: 404 });
+  }
+
+  const filePath = join(STATIC_DIR, clean);
 
   // 安全：目录穿越防护
   if (!isPathSafe(filePath)) {

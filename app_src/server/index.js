@@ -373,7 +373,8 @@ const server = Bun.serve({
       return await handleRequest(req);
     } catch (err) {
       log("error", "Request failed:", err);
-      return json({ ok: false, error: "Internal Server Error" }, 500);
+      const message = err instanceof Error ? err.message : String(err);
+      return json({ ok: false, error: "Internal Server Error", detail: message }, 500);
     }
   },
   websocket: {
