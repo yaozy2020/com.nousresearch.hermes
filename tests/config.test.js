@@ -1,6 +1,9 @@
-import { describe, it } from "node:test";
+import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { isSensitiveKey, maskEnvValues } from "../app_src/server/modules/config.js";
+import { mkdtempSync, rmSync, readFileSync, existsSync } from "fs";
+import { tmpdir } from "os";
+import { join } from "path";
+import { isSensitiveKey, maskEnvValues, lockDashboardConfig } from "../app_src/server/modules/config.js";
 
 describe("config", () => {
   it("detects sensitive env keys", () => {

@@ -1,6 +1,6 @@
 // @bun
 // 静态文件服务（安全加固版）
-import { existsSync, readFileSync } from "fs";
+import { existsSync, readFileSync, statSync } from "fs";
 import { extname, join, resolve, sep } from "path";
 
 const STATIC_DIR = resolve(process.env.STATIC_DIR || "./ui");
@@ -68,6 +68,16 @@ export function serveStatic(pathname, staticDir = STATIC_DIR) {
     if (existsSync(fallback)) {
       return fileResponse(fallback, "text/html");
     }
+    return new Response("Not found", { status: 404 });
+  }
+
+  // 避免请求到目录时泄露目录存在性或抛出非 404 错误
+  try {
+    const stat = statSync(filePath);
+    if (!stat.isFile()) {
+      return new Response("Not found", { status: 404 });
+    }
+  } catch {
     return new Response("Not found", { status: 404 });
   }
 

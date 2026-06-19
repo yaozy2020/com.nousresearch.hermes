@@ -109,6 +109,23 @@ export function writeConfig(yaml, env) {
   return { ok: true };
 }
 
+export function lockDashboardConfig() {
+  const envPath = `${CONFIG_DIR}/.env`;
+  let text = "";
+  if (existsSync(envPath)) text = readFileSync(envPath, "utf-8");
+  const lines = text.split(/\r?\n/);
+  let found = false;
+  const out = lines.map((line) => {
+    if (line.startsWith("HERMES_DASHBOARD_INSECURE=")) {
+      found = true;
+      return "HERMES_DASHBOARD_INSECURE=0";
+    }
+    return line;
+  });
+  if (!found) out.push("HERMES_DASHBOARD_INSECURE=0");
+  return writeConfig(undefined, out.join("\n"));
+}
+
 export function parseEnvText(text) {
   const map = {};
   if (!text) return map;

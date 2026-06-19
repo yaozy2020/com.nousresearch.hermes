@@ -167,6 +167,18 @@ async function openDashboard() {
   }
 }
 
+async function lockDashboard() {
+  if (!confirm('锁定后 Dashboard 将仅监听 127.0.0.1，需重启应用生效。继续？')) return
+  try {
+    const r = await api<{ ok: boolean; error?: string }>('api/dashboard/lock', { method: 'POST' })
+    if (r.ok) showNotification('已锁为本地模式，请重启应用后生效', 'success')
+    else showNotification(r.error || '锁定失败', 'error')
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('锁定失败: ' + (err?.message ?? String(e)), 'error')
+  }
+}
+
 async function terminalAction(act: 'stop') {
   const label = act === 'stop' ? '停止' : '启动'
   showNotification(`终端正在${label}…`, 'info')
@@ -271,8 +283,9 @@ onUnmounted(() => {
         <template #actions>
           <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
-          <UButton v-if="dashboard?.running && !dashboard?.insecure" color="neutral" variant="outline" size="sm" disabled title="Dashboard 已锁为仅本地访问；如需局域网打开，请在 .env 中删除 HERMES_DASHBOARD_INSECURE=0 或设为 1 并重启">本地模式</UButton>
-          <UButton v-else color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
+          <UButton v-if="dashboard?.running && dashboard?.insecure" color="warning" variant="outline" size="sm" @click="lockDashboard">锁为本地</UButton>
+          <UButton v-else-if="dashboard?.running" color="neutral" variant="outline" size="sm" disabled title="Dashboard 已锁为仅本地访问；如需局域网打开，请在 .env 中删除 HERMES_DASHBOARD_INSECURE=0 或设为 1 并重启">本地模式</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running || !dashboard?.insecure" @click="openDashboard">打开</UButton>
         </template>
       </StatusCard>
 
