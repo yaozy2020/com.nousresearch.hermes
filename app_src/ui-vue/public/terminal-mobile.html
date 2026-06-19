@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#0d1117" />
+  <title>Hermes 终端</title>
+  <style>
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      background: #0d1117;
+      color: #c9d1d9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      overflow: hidden;
+      touch-action: manipulation;
+    }
+    #app {
+      display: flex; flex-direction: column;
+      width: 100%; height: 100%;
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+    }
+    header {
+      flex: 0 0 auto;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 12px;
+      background: #161b22;
+      border-bottom: 1px solid #30363d;
+      gap: 10px;
+    }
+    header .info {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+    header .title {
+      font-size: 15px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    header .meta {
+      font-size: 11px; color: #8b949e;
+      margin-top: 2px;
+    }
+    header .actions {
+      display: flex; gap: 8px;
+      flex: 0 0 auto;
+    }
+    .btn {
+      appearance: none; border: none; border-radius: 8px;
+      padding: 8px 12px; font-size: 13px; font-weight: 500;
+      background: #21262d; color: #c9d1d9;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      min-height: 36px;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .btn:active { background: #30363d; }
+    .btn.primary { background: #238636; color: #fff; }
+    .btn.primary:active { background: #2ea043; }
+    .btn.danger { background: #da3633; color: #fff; }
+    .btn.danger:active { background: #f85149; }
+    .btn svg { width: 16px; height: 16px; }
+    #frame-wrap {
+      flex: 1 1 auto;
+      position: relative;
+      min-height: 0;
+      background: #0d1117;
+    }
+    iframe {
+      width: 100%; height: 100%;
+      border: none;
+      display: block;
+    }
+    #overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      background: #0d1117;
+      text-align: center; padding: 24px;
+    }
+    #overlay .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid #30363d;
+      border-top-color: #58a6ff;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+      margin-bottom: 14px;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #overlay .msg { font-size: 14px; color: #8b949e; }
+    #overlay .err { color: #f85149; }
+    #overlay .hint {
+      margin-top: 12px; font-size: 12px; color: #8b949e; line-height: 1.5;
+      max-width: 320px;
+    }
+    footer {
+      flex: 0 0 auto;
+      display: flex; flex-direction: column;
+      background: #161b22;
+      border-top: 1px solid #30363d;
+    }
+    .toolbar {
+      display: flex; gap: 8px;
+      padding: 8px 10px;
+      overflow-x: auto;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .toolbar::-webkit-scrollbar { display: none; }
+    .toolbar .btn {
+      flex: 0 0 auto;
+      padding: 8px 10px;
+      font-size: 12px;
+      min-height: 34px;
+    }
+    .toolbar .btn.key { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    #toast {
+      position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom));
+      transform: translateX(-50%);
+      background: rgba(22, 27, 34, 0.95);
+      color: #c9d1d9;
+      padding: 8px 14px;
+      border-radius: 20px;
+      font-size: 12px;
+      opacity: 0; pointer-events: none; transition: opacity 0.2s;
+      z-index: 100;
+      white-space: nowrap;
+      border: 1px solid #30363d;
+    }
+    #toast.show { opacity: 1; }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <div class="info">
+        <div class="title" id="cmd-title">Hermes 终端</div>
+        <div class="meta" id="status-meta">正在启动…</div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btn-keyboard" title="显示键盘">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2" ry="2"></rect><line x1="6" y1="8" x2="6" y2="8"></line><line x1="10" y1="8" x2="10" y2="8"></line><line x1="14" y1="8" x2="14" y2="8"></line><line x1="18" y1="8" x2="18" y2="8"></line><line x1="6" y1="12" x2="6" y2="12"></line><line x1="10" y1="12" x2="10" y2="12"></line><line x1="14" y1="12" x2="14" y2="12"></line><line x1="18" y1="12" x2="18" y2="12"></line><line x1="6" y1="16" x2="18" y2="16"></line></svg>
+        </button>
+        <button class="btn danger" id="btn-close" title="关闭终端">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+      </div>
+    </header>
+    <div id="frame-wrap">
+      <iframe id="term-frame" sandbox="allow-scripts allow-same-origin allow-forms" class="hidden"></iframe>
+      <div id="overlay">
+        <div class="spinner"></div>
+        <div class="msg" id="overlay-msg">正在连接 ttyd 终端…</div>
+        <div class="hint">若长时间无响应，请检查 hermes 是否已安装。</div>
+      </div>
+    </div>
+    <footer>
+      <div class="toolbar">
+        <button class="btn key" data-seq="\u0003" data-copy="Ctrl+C">Ctrl+C</button>
+        <button class="btn key" data-seq="\t" data-copy="Tab">Tab</button>
+        <button class="btn key" data-seq="\u001b" data-copy="Esc">Esc</button>
+        <button class="btn key" data-seq="\u001b[A" data-copy="↑">↑</button>
+        <button class="btn key" data-seq="\u001b[B" data-copy="↓">↓</button>
+        <button class="btn key" data-seq="\u001b[D" data-copy="←">←</button>
+        <button class="btn key" data-seq="\u001b[C" data-copy="→">→</button>
+        <button class="btn" id="btn-paste">粘贴</button>
+      </div>
+    </footer>
+  </div>
+  <div id="toast"></div>
+  <script>
+    (function() {
+      const params = new URLSearchParams(location.search);
+      const cmd = params.get('cmd') || 'setup';
+      const frame = document.getElementById('term-frame');
+      const overlay = document.getElementById('overlay');
+      const overlayMsg = document.getElementById('overlay-msg');
+      const statusMeta = document.getElementById('status-meta');
+      const cmdTitle = document.getElementById('cmd-title');
+      const toastEl = document.getElementById('toast');
+      let started = false;
+
+      const CMD_LABELS = {
+        setup: 'hermes setup',
+        model: 'hermes model',
+        login: 'hermes login',
+        gateway: 'hermes gateway setup',
+        doctor: 'hermes doctor',
+        status: 'hermes status'
+      };
+      cmdTitle.textContent = CMD_LABELS[cmd] || `hermes ${cmd}`;
+
+      function showToast(msg) {
+        toastEl.textContent = msg;
+        toastEl.classList.add('show');
+        setTimeout(() => toastEl.classList.remove('show'), 1800);
+      }
+
+      function setOverlay(text, isError) {
+        overlayMsg.textContent = text;
+        if (isError) overlayMsg.classList.add('err');
+        else overlayMsg.classList.remove('err');
+      }
+
+      async function start() {
+        try {
+          const res = await fetch('/api/terminal/start', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cmd, mobile: true })
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok || !data.ok) {
+            setOverlay(`启动失败：${data.error || res.statusText || '未知错误'}`, true);
+            statusMeta.textContent = '启动失败';
+            return;
+          }
+          started = true;
+          statusMeta.textContent = `PID ${data.pid} · ${data.args ? data.args.join(' ') : ''}`;
+          frame.src = '/terminal';
+          frame.classList.remove('hidden');
+          overlay.classList.add('hidden');
+          showToast('终端已启动，点击终端区域唤起键盘');
+        } catch (e) {
+          setOverlay(`启动失败：${e.message || '网络错误'}`, true);
+          statusMeta.textContent = '启动失败';
+        }
+      }
+
+      async function stop() {
+        try {
+          await fetch('/api/terminal/stop', { method: 'POST' });
+          showToast('终端已关闭');
+        } catch {}
+        if (window.history.length > 1) window.history.back();
+        else window.location.href = '/';
+      }
+
+      document.getElementById('btn-close').addEventListener('click', stop);
+
+      // 聚焦 iframe 以唤起键盘
+      document.getElementById('btn-keyboard').addEventListener('click', () => {
+        try {
+          frame.contentWindow.focus();
+          const doc = frame.contentDocument;
+          if (doc) {
+            const ta = doc.querySelector('.xterm-helper-textarea');
+            if (ta) ta.focus();
+            else doc.body.focus();
+          }
+        } catch {}
+        showToast('已尝试聚焦终端');
+      });
+
+      // 特殊键：复制到剪贴板，并提示用户粘贴
+      document.querySelectorAll('.toolbar .key').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const seq = btn.dataset.seq;
+          const label = btn.dataset.copy || btn.textContent;
+          try {
+            // 先尝试直接注入到 iframe 的 xterm 输入框
+            let injected = false;
+            try {
+              const doc = frame.contentDocument;
+              if (doc) {
+                const ta = doc.querySelector('.xterm-helper-textarea');
+                if (ta && document.execCommand) {
+                  ta.focus();
+                  const ok = document.execCommand('insertText', false, seq);
+                  if (ok) injected = true;
+                }
+              }
+            } catch {}
+            if (!injected) {
+              await navigator.clipboard.writeText(seq);
+              showToast(`${label} 已复制，请粘贴到终端`);
+            } else {
+              showToast(`${label} 已发送`);
+            }
+          } catch (e) {
+            showToast('发送失败，请使用系统键盘');
+          }
+        });
+      });
+
+      document.getElementById('btn-paste').addEventListener('click', async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (!text) return;
+          let injected = false;
+          try {
+            const doc = frame.contentDocument;
+            if (doc) {
+              const ta = doc.querySelector('.xterm-helper-textarea');
+              if (ta && document.execCommand) {
+                ta.focus();
+                injected = document.execCommand('insertText', false, text);
+              }
+            }
+          } catch {}
+          showToast(injected ? '已粘贴' : '剪贴板内容已复制，请手动粘贴');
+        } catch (e) {
+          showToast('无法读取剪贴板，请长按终端区域粘贴');
+        }
+      });
+
+      window.addEventListener('beforeunload', () => {
+        if (started) fetch('/api/terminal/stop', { method: 'POST', keepalive: true }).catch(() => {});
+      });
+
+      start();
+    })();
+  </script>
+</body>
+</html>

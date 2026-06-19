@@ -95,7 +95,7 @@ if [ ! -x "$APP_SRC/bin/ttyd" ]; then
   echo -e "${RED}ERROR: $APP_SRC/bin/ttyd 不存在或不可执行，无法打包${NC}"
   exit 1
 fi
-tar czf "$BUILD_DIR/app.tgz" server ui bin
+tar czf "$BUILD_DIR/app.tgz" --exclude='*.bak' server ui bin
 cd "$PROJ_DIR"
 
 # 4. 计算 checksum

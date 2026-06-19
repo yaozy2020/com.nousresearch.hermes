@@ -6,11 +6,16 @@ build/
 app_src/ui/index.html
 app_src/ui/public/
 app_src/ui/icons/
+app_src/ui/terminal-mobile.html
 app_src/ui-vue/dist/
 app_src/ui-vue/node_modules/
 app_src/ui-vue/auto-imports.d.ts
 app_src/ui-vue/components.d.ts
 app_src/ui-vue/bun.lock
+app_src/ui-vue/package-lock.json
+
+# 备份文件
+*.bak
 
 # 备份目录
 .bak_*/

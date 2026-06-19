@@ -10,8 +10,9 @@ const RUNTIME_DIR = `${DATA_DIR}/runtime`;
 const BIN_DIR = process.env.HERMES_PANEL_BIN || (process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/bin` : "./bin");
 const TTYD_BIN = `${BIN_DIR}/ttyd`;
 const TERM_PORT = parseInt(process.env.HERMES_TERM_PORT || "9123");
-const TERM_BIND = process.env.HERMES_TERM_BIND || "0.0.0.0";
+const TERM_BIND = process.env.HERMES_TERM_BIND || "127.0.0.1";
 const TERM_PID_FILE = `${RUNTIME_DIR}/ttyd.pid`;
+const TERM_BASE_PATH = process.env.HERMES_TERM_BASE_PATH || "/terminal";
 
 export const TERM_COMMANDS = {
   setup:   ["setup"],
@@ -62,13 +63,15 @@ export async function stopTtyd() {
   return { ok: true };
 }
 
-export async function startTtyd(cmdKey) {
+export async function startTtyd(cmdKey, options = {}) {
+  const { mobile = false } = options;
   const cmdArgs = TERM_COMMANDS[cmdKey];
   if (!cmdArgs) return { ok: false, error: `unknown command: ${cmdKey}` };
   if (!existsSync(TTYD_BIN)) return { ok: false, error: `ttyd not found at ${TTYD_BIN}` };
   if (!existsSync(HERMES_BIN)) return { ok: false, error: "hermes binary not found. Install hermes first." };
   // 一次只允许一个终端
   await stopTtyd();
+  const fontSize = mobile ? 16 : 14;
   const env = {
     ...process.env,
     HERMES_HOME:      `${DATA_DIR}/home`,
@@ -83,9 +86,10 @@ export async function startTtyd(cmdKey) {
     TTYD_BIN,
     "-p", String(TERM_PORT),
     "-i", TERM_BIND,
+    "-b", TERM_BASE_PATH,
     "-W",
     "-O",
-    "-t", "fontSize=14",
+    "-t", `fontSize=${fontSize}`,
     "-t", "theme={\"background\":\"#0d1117\",\"foreground\":\"#c9d1d9\"}",
     "--once",
     HERMES_BIN,
@@ -107,18 +111,14 @@ export async function startTtyd(cmdKey) {
     args: ["hermes", ...cmdArgs],
     port: TERM_PORT,
     pid: ttydProcess.pid,
-    url_hint: `http://<host>:${TERM_PORT}/`
+    mobile,
+    base_path: TERM_BASE_PATH,
+    url_hint: `${TERM_BASE_PATH}/`
   };
 }
 
-export async function proxyTerminal(req, suffix) {
-  if (!isTtydAlive()) {
-    return new Response("Terminal not started. POST /api/terminal/start first.", { status: 503 });
-  }
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: `http://${req.headers.get("host")?.split(":")[0] || "localhost"}:${TERM_PORT}${suffix || "/"}`
-    }
-  });
+export function getTtydTargetUrl(suffix = "/") {
+  if (!isTtydAlive()) return null;
+  const safe = (suffix || "/").replace(/^\/+/, "/");
+  return `http://127.0.0.1:${TERM_PORT}${TERM_BASE_PATH}${safe}`;
 }
