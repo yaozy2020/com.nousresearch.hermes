@@ -316,12 +316,18 @@ onMounted(initWizard)
       <div v-if="gateway?.running" class="space-y-3">
         <UBadge color="success" variant="soft"><UIcon name="i-lucide-activity" class="w-4 h-4 mr-1" />Gateway 运行中</UBadge>
         <div class="text-sm text-[var(--ui-text-muted)]">PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span></div>
-        <UButton color="primary" @click="nextStep">下一步</UButton>
+        <div class="flex justify-between">
+          <UButton color="neutral" variant="outline" @click="prevStep">上一步</UButton>
+          <UButton color="primary" @click="nextStep">下一步</UButton>
+        </div>
       </div>
       <div v-else class="space-y-3">
         <UBadge color="neutral" variant="soft"><UIcon name="i-lucide-stop-circle" class="w-4 h-4 mr-1" />未运行</UBadge>
         <p class="text-sm text-[var(--ui-text-muted)]">点击「启动 Gateway」开始运行 Hermes 主进程。</p>
-        <UButton color="primary" :loading="loading" @click="startGateway">启动 Gateway</UButton>
+        <div class="flex justify-between">
+          <UButton color="neutral" variant="outline" @click="prevStep">上一步</UButton>
+          <UButton color="primary" :loading="loading" @click="startGateway">启动 Gateway</UButton>
+        </div>
       </div>
     </UCard>
 
@@ -340,12 +346,18 @@ onMounted(initWizard)
           端口 <span class="font-mono text-[var(--ui-text)]">{{ dashboard.port || '-' }}</span>
         </div>
         <p class="text-sm text-[var(--ui-text-muted)]">🎉 全部就绪！点击「打开 Dashboard」进入官方 GUI 配置 Provider 与 Channel。</p>
-        <UButton color="primary" @click="openDashboard">打开 Dashboard</UButton>
+        <div class="flex justify-between">
+          <UButton color="neutral" variant="outline" @click="prevStep">上一步</UButton>
+          <UButton color="primary" @click="openDashboard">打开 Dashboard</UButton>
+        </div>
       </div>
       <div v-else class="space-y-3">
         <UBadge color="neutral" variant="soft"><UIcon name="i-lucide-stop-circle" class="w-4 h-4 mr-1" />未运行</UBadge>
         <p class="text-sm text-[var(--ui-text-muted)]">启动 Dashboard 后即可在浏览器里访问官方 GUI（端口 {{ dashboard?.port || 9119 }}）。</p>
-        <UButton color="primary" :loading="loading" @click="startDashboard">启动 Dashboard</UButton>
+        <div class="flex justify-between">
+          <UButton color="neutral" variant="outline" @click="prevStep">上一步</UButton>
+          <UButton color="primary" :loading="loading" @click="startDashboard">启动 Dashboard</UButton>
+        </div>
       </div>
     </UCard>
   </div>

@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.23.7-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.23.8-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,11 @@ bash build.sh
 ## 版本历史
 
 
-### v0.23.7（当前版本）
+### v0.23.8（当前版本）
+
+- **安装向导支持返回上一步**：步骤 3（启动 Gateway）和步骤 4（启动 Dashboard）均增加「上一步」按钮，可返回修改 Provider 或检查安装状态
+
+### v0.23.7
 
 - **修复高级配置不生效**：配置目录从 `${DATA_DIR}/config` 对齐到 Hermes 实际读取的 `HERMES_HOME`（即 `~/.hermes`）
   - `config.yaml` / `.env` 现在写入 `${HERMES_HOME}/`，保存后重启 Gateway 即可被 Hermes 正确加载
