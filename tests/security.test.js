@@ -64,7 +64,7 @@ describe("security / CSRF", () => {
     assert.strictEqual(isSafeWriteRequest(req), true);
   });
 
-  it("allows private IP origin even when req Host is internal socket name", () => {
+  it("rejects private IP origin when req Host is internal socket name", () => {
     const req = {
       method: "POST",
       url: "http://com.nousresearch.hermes/api/gateway/start",
@@ -78,7 +78,7 @@ describe("security / CSRF", () => {
         }
       }
     };
-    assert.strictEqual(isSafeWriteRequest(req), true);
+    assert.strictEqual(isSafeWriteRequest(req), false);
   });
 
   it("prefers Host header over req.url when checking origin", () => {
@@ -132,6 +132,23 @@ describe("security / CSRF", () => {
     assert.strictEqual(isSafeWriteRequest(req), false);
   });
 
+  it("rejects private IP origin when req Host is public domain", () => {
+    const req = {
+      method: "POST",
+      url: "http://hermes.example.com/api/gateway/start",
+      headers: {
+        get(name) {
+          const map = {
+            host: "hermes.example.com",
+            origin: "http://192.168.10.236"
+          };
+          return map[name.toLowerCase()] || null;
+        }
+      }
+    };
+    assert.strictEqual(isSafeWriteRequest(req), false);
+  });
+
   it("allows HERMES_TRUSTED_HOSTS configured origin", () => {
     process.env.HERMES_TRUSTED_HOSTS = "gateway.fnos.local,192.168.10.1";
     const req = makeReq("POST", "http://nas.local/api/gateway/start", {
@@ -141,11 +158,11 @@ describe("security / CSRF", () => {
     delete process.env.HERMES_TRUSTED_HOSTS;
   });
 
-  it("allows Origin: null", () => {
+  it("rejects Origin: null for write requests", () => {
     const req = makeReq("POST", "http://nas.local/api/gateway/start", {
       origin: "null"
     });
-    assert.strictEqual(isSafeWriteRequest(req), true);
+    assert.strictEqual(isSafeWriteRequest(req), false);
   });
 
   it("rejects malformed origin", () => {

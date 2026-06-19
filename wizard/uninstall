@@ -1,21 +1,29 @@
 [{
-  "stepTitle": "卸载应用",
-  "items": [{
-    "type": "tips",
-    "helpText": "保留或删除应用设置。"
-  },
-  {
-    "type": "radio",
-    "field": "wizard_delete_data",
-    "label": "仅卸载，保留现有文件以备将来重新安装。",
-    "initValue": "false",
-    "options": [{
-      "label": "保留现有文件",
-      "value": "false"
+  "stepTitle": "卸载 Hermes",
+  "items": [
+    {
+      "type": "tips",
+      "helpText": "你可以选择保留配置文件和运行环境，方便下次重装时快速恢复。"
     },
     {
-      "label": "清除所有应用数据文件（不可恢复）！！！",
-      "value": "true"
-    }]
-  }]
+      "type": "switch",
+      "field": "wizard_keep_config",
+      "label": "保留配置文件",
+      "initValue": true,
+      "helpText": "保留 config.yaml、.env、SOUL.md 等配置，下次安装后无需重新设置。"
+    },
+    {
+      "type": "switch",
+      "field": "wizard_keep_runtime",
+      "label": "保留运行环境",
+      "initValue": true,
+      "helpText": "保留 venv、已下载模型、运行时状态与日志，下次安装可复用。"
+    },
+    {
+      "type": "switch",
+      "field": "wizard_confirm_uninstall",
+      "label": "我已了解风险，确认卸载",
+      "initValue": false
+    }
+  ]
 }]
