@@ -1,8 +1,25 @@
 // @bun
 // 配置与消息频道管理（config.yaml / .env）
-import { existsSync, readFileSync, writeFileSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
 
-const CONFIG_DIR = process.env.HERMES_CONFIG_DIR || `${process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data"}/config`;
+const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
+const HERMES_HOME = process.env.HERMES_HOME || `${DATA_DIR}/home`;
+const CONFIG_DIR = process.env.HERMES_CONFIG_DIR || HERMES_HOME;
+
+// Hermes 读取配置的位置是 HERMES_HOME 下的 config.yaml / .env。
+// 旧版本 (< v0.23.7) 把配置写在 ${DATA_DIR}/config，导致改配置不生效；
+// 启动时如果新位置没有文件而旧位置有，自动迁移一次。
+if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
+const LEGACY_CONFIG_DIR = `${DATA_DIR}/config`;
+function migrateConfigFile(name) {
+  const src = `${LEGACY_CONFIG_DIR}/${name}`;
+  const dst = `${CONFIG_DIR}/${name}`;
+  if (existsSync(src) && !existsSync(dst)) {
+    try { copyFileSync(src, dst); } catch {}
+  }
+}
+migrateConfigFile("config.yaml");
+migrateConfigFile(".env");
 
 // 仅暴露"纯 .env 写入即生效"的频道字段；其他频道引导用户进 Hermes Web UI
 export const CHANNEL_FIELDS = {

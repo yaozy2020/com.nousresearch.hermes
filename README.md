@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.23.6-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.23.7-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,14 @@ bash build.sh
 ## 版本历史
 
 
-### v0.23.6（当前版本）
+### v0.23.7（当前版本）
+
+- **修复高级配置不生效**：配置目录从 `${DATA_DIR}/config` 对齐到 Hermes 实际读取的 `HERMES_HOME`（即 `~/.hermes`）
+  - `config.yaml` / `.env` 现在写入 `${HERMES_HOME}/`，保存后重启 Gateway 即可被 Hermes 正确加载
+  - 启动时自动把旧位置（`${DATA_DIR}/config/`）的配置迁移到新位置
+- **清理 Gateway / Dashboard 环境变量**：移除未使用的 `HERMES_CONFIG`、`HERMES_DATA`、`HERMES_WORKSPACE`，避免误导
+
+### v0.23.6
 
 - **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口；新增 `/ttyd-mobile` 全屏移动端终端壳；桌面端保留新标签页打开，移动端自动跳转移动壳
 - **修复 ttyd 终端黑屏/白屏**：移除 `--once`/`-O` 限制、重写 `Location` 避免 127.0.0.1 跳转、修复 WebSocket subprotocol、自动寻找可用端口、统一带斜杠访问 `/ttyd/`

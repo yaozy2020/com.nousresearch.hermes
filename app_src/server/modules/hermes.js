@@ -6,14 +6,13 @@ import { broadcastLog } from "./logger.js";
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
 const VENV_DIR = process.env.HERMES_VENV || `${DATA_DIR}/venv`;
 const HERMES_BIN = process.env.HERMES_BIN || `${VENV_DIR}/bin/hermes`;
-const CONFIG_DIR = `${DATA_DIR}/config`;
 const LOG_DIR = `${DATA_DIR}/logs`;
 const RUNTIME_DIR = `${DATA_DIR}/runtime`;
 const PID_FILE = `${RUNTIME_DIR}/gateway.pid`;
 const DASHBOARD_PID_FILE = `${RUNTIME_DIR}/dashboard.pid`;
 const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
 
-for (const d of [CONFIG_DIR, LOG_DIR, RUNTIME_DIR]) {
+for (const d of [LOG_DIR, RUNTIME_DIR]) {
   if (!existsSync(d)) mkdirSync(d, { recursive: true });
 }
 
@@ -96,9 +95,6 @@ export async function startGateway() {
   const env = {
     ...process.env,
     HERMES_HOME: `${DATA_DIR}/home`,
-    HERMES_DATA: DATA_DIR,
-    HERMES_WORKSPACE: `${DATA_DIR}/workspace`,
-    HERMES_CONFIG: CONFIG_DIR,
     HOME: `${DATA_DIR}/home`
   };
   gatewayProcess = Bun.spawn([HERMES_BIN, "gateway", "run"], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
@@ -185,9 +181,6 @@ export async function startDashboard() {
   const env = {
     ...process.env,
     HERMES_HOME: `${DATA_DIR}/home`,
-    HERMES_DATA: DATA_DIR,
-    HERMES_WORKSPACE: `${DATA_DIR}/workspace`,
-    HERMES_CONFIG: CONFIG_DIR,
     HOME: `${DATA_DIR}/home`,
     HERMES_DASHBOARD_INSECURE: "1"
   };
