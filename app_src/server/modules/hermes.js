@@ -201,12 +201,16 @@ export async function startDashboard() {
     HOME: `${DATA_DIR}/home`
     // 移除 HERMES_DASHBOARD_INSECURE 与 --insecure，不再关闭安全校验
   };
-  // 安全：移除 --insecure，让 Hermes Dashboard 自身的安全校验生效；
-  // 绑定 0.0.0.0 以便在 fnOS 内网中通过浏览器直接访问（受 Dashboard 自身认证保护）
-  dashboardProcess = Bun.spawn([
-    HERMES_BIN, "dashboard", "--host", "0.0.0.0", "--port", String(DASHBOARD_PORT),
-    "--skip-build", "--no-open"
-  ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
+  // 安全：Dashboard 在 non-loopback 绑定下强制要求 OAuth provider；
+  // 内网 NAS 无 provider 时，默认绑定 127.0.0.1 并通过面板反向代理访问，
+  // 避免直接暴露无认证 Dashboard 到网络。
+  const dashboardHost = process.env.HERMES_DASHBOARD_HOST || "127.0.0.1";
+  const dashboardInsecure = process.env.HERMES_DASHBOARD_INSECURE === "1";
+  const dashboardArgs = [HERMES_BIN, "dashboard", "--host", dashboardHost, "--port", String(DASHBOARD_PORT), "--skip-build", "--no-open"];
+  if (dashboardInsecure) {
+    dashboardArgs.push("--insecure");
+  }
+  dashboardProcess = Bun.spawn(dashboardArgs, { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
   processStartTimes.set(dashboardProcess.pid, Date.now());
   writeFileSync(DASHBOARD_PID_FILE, String(dashboardProcess.pid));
   (async () => {

@@ -148,12 +148,14 @@ async function hermesRestartAll() {
 async function openDashboard() {
   try {
     const s = await api<DashboardStatus>('api/dashboard/status')
-    const port = s.port || 9119
-    const host = window.location.hostname || 'localhost'
-    window.open(`http://${host}:${port}`, '_blank', 'noopener')
+    if (!s.running) {
+      showNotification('Dashboard 未运行，请先启动', 'warning')
+      return
+    }
+    const proxyPath = '/app/com-nousresearch-hermes/api/dashboard/proxy/'
+    window.open(proxyPath, '_blank', 'noopener')
   } catch {
-    const host = window.location.hostname || 'localhost'
-    window.open(`http://${host}:9119`, '_blank', 'noopener')
+    showNotification('无法获取 Dashboard 状态', 'error')
   }
 }
 

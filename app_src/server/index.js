@@ -247,6 +247,50 @@ async function handleRequest(req) {
       const result = await startDashboard();
       return json(result, result.ok ? 200 : 500);
     }
+    if (pathname.startsWith("/api/dashboard/proxy")) {
+      // 反向代理到本地 Dashboard，避免将无认证 Dashboard 直接暴露到网络
+      if (!isDashboardRunning()) {
+        return json({ ok: false, error: "Dashboard 未运行" }, 503);
+      }
+      const targetPath = pathname.slice("/api/dashboard/proxy".length) || "/";
+      const targetUrl = `http://127.0.0.1:${DASHBOARD_PORT}${targetPath}${url.search}`;
+      try {
+        const proxyHeaders = new Headers();
+        for (const [k, v] of req.headers) {
+          if (["host", "origin", "referer"].includes(k.toLowerCase())) continue;
+          proxyHeaders.set(k, v);
+        }
+        const proxyReq = new Request(targetUrl, {
+          method: req.method,
+          headers: proxyHeaders,
+          body: ["GET", "HEAD"].includes(method) ? undefined : req.body,
+        });
+        const resp = await fetch(proxyReq);
+        const outHeaders = new Headers();
+        for (const [k, v] of resp.headers) {
+          const kl = k.toLowerCase();
+          if (["content-encoding", "content-length", "transfer-encoding", "connection"].includes(kl)) continue;
+          outHeaders.set(k, v);
+        }
+        // 对 text/html 做路径前缀重写，使相对/绝对资源都能走代理
+        const ct = resp.headers.get("content-type") || "";
+        if (ct.includes("text/html")) {
+          const text = await resp.text();
+          const proxyBase = "/app/com-nousresearch-hermes/api/dashboard/proxy";
+          // 将 href="/xxx" / src="/xxx" 改为走代理路径；保留 data: 与 http(s): 不变
+          const rewritten = text
+            .replace(/(href|src)="\//g, `$1="${proxyBase}/`)
+            .replace(/(href|src)='\//g, `$1='${proxyBase}/`)
+            .replace(/url\("?\//g, `url("${proxyBase}/`);
+          outHeaders.set("content-type", ct);
+          outHeaders.set("content-length", String(Buffer.byteLength(rewritten)));
+          return new Response(rewritten, { status: resp.status, statusText: resp.statusText, headers: outHeaders });
+        }
+        return new Response(resp.body, { status: resp.status, statusText: resp.statusText, headers: outHeaders });
+      } catch (err) {
+        return json({ ok: false, error: "Dashboard 代理失败: " + String(err) }, 502);
+      }
+    }
     if (pathname === "/api/hermes/restart" && method === "POST") {
       const result = await restartHermesAll();
       return json(result);
