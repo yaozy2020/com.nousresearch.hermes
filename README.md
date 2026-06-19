@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.3)
+[![Version](https://img.shields.io/badge/version-0.26.4-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.4)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,14 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.3（当前版本）
+### v0.26.4（当前版本）
+
+重新设计卸载向导，降低误操作：
+- 合并为「保留用户数据」和「确认删除用户数据」两个开关，默认保留数据，重装后可自动恢复。
+- 卸载脚本增加更清晰的日志，明确是否进入删除分支。
+- 保留对旧版 `wizard_keep_config` / `wizard_keep_runtime` / `wizard_delete_data` 的兼容。
+
+### v0.26.3
 
 修复桌面端图标显示：在 `app/ui/images/` 补齐 `icon_64.png` / `icon_256.png`，并将 `app/ui/config` 图标路径改为 `images/icon_{0}.png`（与 QwenPaw 一致）。
 

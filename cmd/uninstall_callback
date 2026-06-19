@@ -1,17 +1,17 @@
 #!/bin/bash
 
 ### uninstall_callback — 处理 wizard 卸载选择，按需删除数据
-### 新 wizard 通过三个开关传递：
-###   wizard_confirm_uninstall : true 时才继续，否则中止
-###   wizard_keep_config       : true 时保留 config / home / .env
-###   wizard_keep_runtime      : true 时保留 venv / install / workspace / runtime / state / logs / .hermes_*
+### 新 wizard 通过两个开关传递：
+###   wizard_keep_data       : true 时保留 config / home / .env / venv / install / workspace / runtime / state / logs / .hermes_*
+###   wizard_confirm_delete  : true 时确认删除用户数据；false 或未勾选则保留数据
 ### 兼容旧 wizard 的 wizard_delete_data：true 表示全部删除，false 表示全部保留
+### 兼容旧 wizard 的 wizard_keep_config / wizard_keep_runtime：任一存在时按旧逻辑处理
 ### 不论选哪种，瞬态 socket / pid / 临时目录都会被清掉
 
 DATA_DIR="${TRIM_PKGHOME}/data"
 APP_DIR="${TRIM_APPDEST}"
 
-# 优先写入 DATA_DIR/logs；若 DATA_DIR 不存在或不可写，回退到 stderr
+# 优先写入 DATA_DIR/logs；若 DATA_DIR 不存在或不可写，回退到 stdout
 LOG_FILE="${DATA_DIR}/logs/uninstall.log"
 log() {
   local msg="$(date '+%F %T') $*"
@@ -22,7 +22,8 @@ log() {
 }
 
 log "=== uninstall_callback start ==="
-log "wizard_confirm_uninstall=${wizard_confirm_uninstall:-<unset>}"
+log "wizard_keep_data=${wizard_keep_data:-<unset>}"
+log "wizard_confirm_delete=${wizard_confirm_delete:-<unset>}"
 log "wizard_keep_config=${wizard_keep_config:-<unset>}"
 log "wizard_keep_runtime=${wizard_keep_runtime:-<unset>}"
 log "wizard_delete_data(legacy)=${wizard_delete_data:-<unset>}"
@@ -47,46 +48,51 @@ rm -f "${APP_DIR}/com.nousresearch.hermes.sock" 2>/dev/null
 rm -f "${APP_DIR}"/*.sock 2>/dev/null
 rm -f "${DATA_DIR}/runtime/"*.pid 2>/dev/null
 
-# 1) 兼容旧 wizard：如果传了 wizard_delete_data，按旧语义处理（旧 wizard 没有确认开关，直接按选择执行）
+# 1) 兼容旧 wizard：如果传了 wizard_delete_data，按旧语义处理
 if [ -n "${wizard_delete_data}" ]; then
   if [ "${wizard_delete_data}" != "true" ]; then
     log "Legacy wizard: user chose to keep data, leaving DATA_DIR untouched: ${DATA_DIR}"
     log "=== uninstall_callback done (data kept) ==="
     exit 0
   fi
-  # wizard_delete_data=true 继续走下面的全部删除逻辑
-  wizard_keep_config="false"
-  wizard_keep_runtime="false"
+  wizard_keep_data="false"
+  wizard_confirm_delete="true"
 fi
 
-# 2) 默认安全：若新 wizard 的开关一个都没设置，视为全部保留（避免 wizard 解析失败时误删）
-if [ -z "${wizard_keep_config}" ] && [ -z "${wizard_keep_runtime}" ]; then
+# 2) 兼容旧 wizard：如果传了 wizard_keep_config / wizard_keep_runtime，按旧语义处理
+if [ -n "${wizard_keep_config}" ] || [ -n "${wizard_keep_runtime}" ]; then
+  log "Legacy keep switches detected, using legacy logic"
+  if [ "${wizard_keep_config}" = "true" ] && [ "${wizard_keep_runtime}" = "true" ]; then
+    log "Legacy wizard: keep all, leaving DATA_DIR untouched: ${DATA_DIR}"
+    log "=== uninstall_callback done (data kept) ==="
+    exit 0
+  fi
+  # 任一不保留即视为需要确认删除
+  if [ "${wizard_confirm_uninstall:-false}" != "true" ]; then
+    log "Legacy wizard: destructive deletion requested but not confirmed. Keeping data."
+    log "=== uninstall_callback done (data kept) ==="
+    exit 0
+  fi
+  wizard_keep_data="false"
+  wizard_confirm_delete="true"
+fi
+
+# 3) 默认安全：若新 wizard 的开关一个都没设置，视为全部保留（避免 wizard 解析失败时误删）
+if [ -z "${wizard_keep_data}" ] && [ -z "${wizard_confirm_delete}" ]; then
   log "No retention switches provided, keeping DATA_DIR untouched for safety: ${DATA_DIR}"
   log "=== uninstall_callback done (data kept) ==="
   exit 0
 fi
 
-# 3) 新 wizard 必须显式确认卸载
-if [ "${wizard_confirm_uninstall}" != "true" ]; then
-  log "ERROR: uninstall not confirmed (wizard_confirm_uninstall != true). Aborting."
-  log "=== uninstall_callback done (aborted: not confirmed) ==="
-  exit 1
-fi
-
-KEEP_CONFIG="${wizard_keep_config:-false}"
-KEEP_RUNTIME="${wizard_keep_runtime:-false}"
-
-log "Resolved keep_config=${KEEP_CONFIG}, keep_runtime=${KEEP_RUNTIME}"
-
-# 4) 两个都保留 → 直接退出
-if [ "${KEEP_CONFIG}" = "true" ] && [ "${KEEP_RUNTIME}" = "true" ]; then
-  log "User chose to keep config and runtime, leaving DATA_DIR untouched: ${DATA_DIR}"
+# 4) 新 wizard 逻辑：保留数据 或 未确认删除 → 直接退出
+if [ "${wizard_keep_data}" = "true" ] || [ "${wizard_confirm_delete}" != "true" ]; then
+  log "User chose to keep data or did not confirm deletion. Leaving DATA_DIR untouched: ${DATA_DIR}"
   log "=== uninstall_callback done (data kept) ==="
   exit 0
 fi
 
-# 5) 需要删除部分或全部数据 → 校验路径安全
-log "User chose to delete data, wiping selected contents of ${DATA_DIR} ..."
+# 5) 需要删除全部数据 → 校验路径安全
+log "User chose to delete all data, wiping selected contents of ${DATA_DIR} ..."
 
 if ! is_safe_data_dir "$DATA_DIR"; then
   log "ERROR: DATA_DIR ${DATA_DIR} is not in allowed paths. Aborting delete for safety."
@@ -98,40 +104,26 @@ if [ -d "$DATA_DIR" ]; then
   DU=$(du -sh "$DATA_DIR" 2>/dev/null | awk '{print $1}')
   log "Data dir size before delete: $DU"
 
-  # 配置类目录
-  if [ "${KEEP_CONFIG}" != "true" ]; then
-    for SUB in config home; do
-      TARGET="${DATA_DIR}/${SUB}"
-      if [ -e "$TARGET" ]; then
-        log "  removing ${TARGET} ..."
-        rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
-      fi
-    done
-    # 根目录下的 .env 也是配置
-    if [ -e "${DATA_DIR}/.env" ]; then
-      log "  removing ${DATA_DIR}/.env ..."
-      rm -f "${DATA_DIR}/.env" 2>/dev/null || log "    failed to remove ${DATA_DIR}/.env"
-    fi
-  fi
-
-  # 运行环境类目录
-  if [ "${KEEP_RUNTIME}" != "true" ]; then
-    for SUB in venv install workspace runtime state logs; do
-      TARGET="${DATA_DIR}/${SUB}"
-      if [ -e "$TARGET" ]; then
-        log "  removing ${TARGET} ..."
-        rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
-      fi
-    done
-    # 隐藏运行时文件
-    for TARGET in "${DATA_DIR}"/.hermes_*; do
-      [ -e "$TARGET" ] || continue
+  for SUB in config home venv install workspace runtime state logs; do
+    TARGET="${DATA_DIR}/${SUB}"
+    if [ -e "$TARGET" ]; then
       log "  removing ${TARGET} ..."
       rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
-    done
-  fi
+    fi
+  done
 
-  # 最后尝试删空 data 目录本身（若还有保留的子目录，会保留）
+  # 隐藏运行时文件
+  for TARGET in "${DATA_DIR}"/.*; do
+    case "$TARGET" in
+      "${DATA_DIR}/."*|"${DATA_DIR}/..") continue ;;
+    esac
+    if [ -e "$TARGET" ]; then
+      log "  removing ${TARGET} ..."
+      rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
+    fi
+  done
+
+  # 最后尝试删空 data 目录本身
   rmdir "$DATA_DIR" 2>/dev/null || log "DATA_DIR not empty, leaving for fnOS to clean"
 fi
 

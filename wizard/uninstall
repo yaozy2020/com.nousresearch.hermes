@@ -3,27 +3,21 @@
   "items": [
     {
       "type": "tips",
-      "helpText": "你可以选择保留配置文件和运行环境，方便下次重装时快速恢复。"
+      "helpText": "应用本身将由飞牛系统卸载。本向导只控制是否同时删除用户数据。保留数据可在重装后自动恢复。"
     },
     {
       "type": "switch",
-      "field": "wizard_keep_config",
-      "label": "保留配置文件",
+      "field": "wizard_keep_data",
+      "label": "保留用户数据（配置与运行环境）",
       "initValue": "true",
-      "helpText": "保留 config.yaml、.env、SOUL.md 等配置，避免误卸载后重新设置。"
+      "helpText": "保留 config.yaml、.env、venv、已下载模型、运行时状态与日志，重装后可自动恢复。"
     },
     {
       "type": "switch",
-      "field": "wizard_keep_runtime",
-      "label": "保留运行环境",
-      "initValue": "true",
-      "helpText": "保留 venv、已下载模型、运行时状态与日志，避免误卸载后重新下载。"
-    },
-    {
-      "type": "switch",
-      "field": "wizard_confirm_uninstall",
-      "label": "我已了解风险，确认卸载",
-      "initValue": "false"
+      "field": "wizard_confirm_delete",
+      "label": "确认删除用户数据",
+      "initValue": "false",
+      "helpText": "如需彻底删除配置与运行环境，请先关闭上方“保留用户数据”开关，再勾选此项。不勾选则保留所有数据。"
     }
   ]
 }]

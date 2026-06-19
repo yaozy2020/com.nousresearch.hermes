@@ -100,37 +100,84 @@ describe("cmd callbacks", () => {
     assert.ok(existsSync(join(dataDir, "home", ".env")), ".env should be kept");
   });
 
-  it("new uninstall wizard aborts without confirmation", () => {
+  it("new wizard keeps data by default", () => {
     const pkgHome = join(base, "home");
     const appDest = join(base, "app");
     const dataDir = join(pkgHome, "data");
     mkdirSync(join(dataDir, "home"), { recursive: true });
+    mkdirSync(join(dataDir, "venv"), { recursive: true });
     writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
+    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
 
-    let threw = false;
-    try {
-      execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
-        env: {
-          ...process.env,
-          TRIM_PKGHOME: pkgHome,
-          TRIM_APPDEST: appDest,
-          HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
-          wizard_keep_config: "false",
-          wizard_keep_runtime: "false",
-          wizard_confirm_uninstall: "false"
-        },
-        stdio: "pipe"
-      });
-    } catch (err) {
-      threw = true;
-      assert.strictEqual(err.status, 1);
-    }
+    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
+      env: {
+        ...process.env,
+        TRIM_PKGHOME: pkgHome,
+        TRIM_APPDEST: appDest,
+        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
+        wizard_keep_data: "true",
+        wizard_confirm_delete: "false"
+      },
+      stdio: "pipe"
+    });
 
-    assert.ok(threw, "uninstall_callback should abort when not confirmed");
-    assert.ok(existsSync(join(dataDir, "home", ".env")), ".env should be kept after abort");
+    assert.ok(existsSync(join(dataDir, "home", ".env")), "config should be kept");
+    assert.ok(existsSync(join(dataDir, "venv", "python")), "runtime should be kept");
   });
 
-  it("new uninstall wizard keeps config and runtime when requested", () => {
+  it("new wizard keeps data if confirmation is not checked", () => {
+    const pkgHome = join(base, "home");
+    const appDest = join(base, "app");
+    const dataDir = join(pkgHome, "data");
+    mkdirSync(join(dataDir, "home"), { recursive: true });
+    mkdirSync(join(dataDir, "venv"), { recursive: true });
+    writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
+    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
+
+    // even if keep_data is false, confirmation must be true to delete
+    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
+      env: {
+        ...process.env,
+        TRIM_PKGHOME: pkgHome,
+        TRIM_APPDEST: appDest,
+        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
+        wizard_keep_data: "false",
+        wizard_confirm_delete: "false"
+      },
+      stdio: "pipe"
+    });
+
+    assert.ok(existsSync(join(dataDir, "home", ".env")), "config should be kept");
+    assert.ok(existsSync(join(dataDir, "venv", "python")), "runtime should be kept");
+  });
+
+  it("new wizard deletes everything when keep_data is off and confirmed", () => {
+    const pkgHome = join(base, "home");
+    const appDest = join(base, "app");
+    const dataDir = join(pkgHome, "data");
+    mkdirSync(join(dataDir, "home"), { recursive: true });
+    mkdirSync(join(dataDir, "venv"), { recursive: true });
+    mkdirSync(join(dataDir, "logs"), { recursive: true });
+    writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
+    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
+
+    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
+      env: {
+        ...process.env,
+        TRIM_PKGHOME: pkgHome,
+        TRIM_APPDEST: appDest,
+        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
+        wizard_keep_data: "false",
+        wizard_confirm_delete: "true"
+      },
+      stdio: "pipe"
+    });
+
+    assert.ok(!existsSync(join(dataDir, "home", ".env")), "config should be removed");
+    assert.ok(!existsSync(join(dataDir, "venv", "python")), "runtime should be removed");
+  });
+
+  it("legacy keep switches still work: keep all", () => {
     const pkgHome = join(base, "home");
     const appDest = join(base, "app");
     const dataDir = join(pkgHome, "data");
@@ -156,7 +203,7 @@ describe("cmd callbacks", () => {
     assert.ok(existsSync(join(dataDir, "venv", "python")), "runtime should be kept");
   });
 
-  it("new uninstall wizard deletes runtime but keeps config", () => {
+  it("legacy keep switches still work: delete all when confirmed", () => {
     const pkgHome = join(base, "home");
     const appDest = join(base, "app");
     const dataDir = join(pkgHome, "data");
@@ -171,66 +218,40 @@ describe("cmd callbacks", () => {
         TRIM_PKGHOME: pkgHome,
         TRIM_APPDEST: appDest,
         HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
-        wizard_keep_config: "true",
+        wizard_keep_config: "false",
         wizard_keep_runtime: "false",
         wizard_confirm_uninstall: "true"
+      },
+      stdio: "pipe"
+    });
+
+    assert.ok(!existsSync(join(dataDir, "home", ".env")), "config should be removed");
+    assert.ok(!existsSync(join(dataDir, "venv", "python")), "runtime should be removed");
+  });
+
+  it("legacy keep switches keep data when not confirmed", () => {
+    const pkgHome = join(base, "home");
+    const appDest = join(base, "app");
+    const dataDir = join(pkgHome, "data");
+    mkdirSync(join(dataDir, "home"), { recursive: true });
+    mkdirSync(join(dataDir, "venv"), { recursive: true });
+    writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
+    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
+
+    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
+      env: {
+        ...process.env,
+        TRIM_PKGHOME: pkgHome,
+        TRIM_APPDEST: appDest,
+        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
+        wizard_keep_config: "false",
+        wizard_keep_runtime: "false",
+        wizard_confirm_uninstall: "false"
       },
       stdio: "pipe"
     });
 
     assert.ok(existsSync(join(dataDir, "home", ".env")), "config should be kept");
-    assert.ok(!existsSync(join(dataDir, "venv", "python")), "runtime should be removed");
-  });
-
-  it("new uninstall wizard deletes config but keeps runtime", () => {
-    const pkgHome = join(base, "home");
-    const appDest = join(base, "app");
-    const dataDir = join(pkgHome, "data");
-    mkdirSync(join(dataDir, "home"), { recursive: true });
-    mkdirSync(join(dataDir, "venv"), { recursive: true });
-    writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
-    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
-
-    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
-      env: {
-        ...process.env,
-        TRIM_PKGHOME: pkgHome,
-        TRIM_APPDEST: appDest,
-        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
-        wizard_keep_config: "false",
-        wizard_keep_runtime: "true",
-        wizard_confirm_uninstall: "true"
-      },
-      stdio: "pipe"
-    });
-
-    assert.ok(!existsSync(join(dataDir, "home", ".env")), "config should be removed");
     assert.ok(existsSync(join(dataDir, "venv", "python")), "runtime should be kept");
-  });
-
-  it("new uninstall wizard deletes everything when both switches are off", () => {
-    const pkgHome = join(base, "home");
-    const appDest = join(base, "app");
-    const dataDir = join(pkgHome, "data");
-    mkdirSync(join(dataDir, "home"), { recursive: true });
-    mkdirSync(join(dataDir, "venv"), { recursive: true });
-    writeFileSync(join(dataDir, "home", ".env"), "TEST=1\n");
-    writeFileSync(join(dataDir, "venv", "python"), "bin\n");
-
-    execFileSync("bash", [join(REPO_ROOT, "cmd/uninstall_callback")], {
-      env: {
-        ...process.env,
-        TRIM_PKGHOME: pkgHome,
-        TRIM_APPDEST: appDest,
-        HERMES_UNINSTALL_TEST_DATA_DIR: dataDir,
-        wizard_keep_config: "false",
-        wizard_keep_runtime: "false",
-        wizard_confirm_uninstall: "true"
-      },
-      stdio: "pipe"
-    });
-
-    assert.ok(!existsSync(join(dataDir, "home", ".env")), "config should be removed");
-    assert.ok(!existsSync(join(dataDir, "venv", "python")), "runtime should be removed");
   });
 });
