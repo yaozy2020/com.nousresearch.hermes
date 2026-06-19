@@ -9,15 +9,15 @@
       "type": "switch",
       "field": "wizard_keep_config",
       "label": "保留配置文件",
-      "initValue": "false",
-      "helpText": "保留 config.yaml、.env、SOUL.md 等配置；不勾选则删除。"
+      "initValue": "true",
+      "helpText": "保留 config.yaml、.env、SOUL.md 等配置，避免误卸载后重新设置。"
     },
     {
       "type": "switch",
       "field": "wizard_keep_runtime",
       "label": "保留运行环境",
-      "initValue": "false",
-      "helpText": "保留 venv、已下载模型、运行时状态与日志；不勾选则删除。"
+      "initValue": "true",
+      "helpText": "保留 venv、已下载模型、运行时状态与日志，避免误卸载后重新下载。"
     },
     {
       "type": "switch",
