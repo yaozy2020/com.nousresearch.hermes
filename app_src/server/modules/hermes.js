@@ -1,6 +1,7 @@
 // @bun
 // Hermes gateway / dashboard / 安装 / 重启
 import { existsSync, readFileSync, writeFileSync, unlinkSync, mkdirSync, chmodSync } from "fs";
+import { createServer } from "net";
 import { broadcastLog } from "./logger.js";
 
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
@@ -14,6 +15,19 @@ const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
 
 for (const d of [LOG_DIR, RUNTIME_DIR]) {
   if (!existsSync(d)) mkdirSync(d, { recursive: true });
+}
+
+function isPortInUse(port, host = "127.0.0.1") {
+  return new Promise((resolve) => {
+    const server = createServer();
+    server.once("error", (err) => {
+      resolve(err.code === "EADDRINUSE");
+    });
+    server.once("listening", () => {
+      server.close(() => resolve(false));
+    });
+    server.listen(port, host);
+  });
 }
 
 let gatewayProcess = null;
@@ -56,25 +70,32 @@ export function getDashboardUptime() {
   return formatUptime(getProcessUptime(getDashboardPid()));
 }
 
+function isProcessAlive(pid, expectedName = null) {
+  if (!pid || isNaN(pid)) return false;
+  try {
+    process.kill(pid, 0);
+  } catch {
+    return false;
+  }
+  if (!expectedName) return true;
+  try {
+    const cmdline = readFileSync(`/proc/${pid}/cmdline`, "utf-8");
+    // /proc/PID/cmdline 中参数以 \0 分隔
+    return cmdline.includes(expectedName);
+  } catch {
+    return true; // 无法读取时保守认为存活，避免误杀
+  }
+}
+
 export function isGatewayRunning() {
   if (gatewayProcess && gatewayProcess.pid) {
-    try {
-      process.kill(gatewayProcess.pid, 0);
-      return true;
-    } catch {
-      gatewayProcess = null;
-    }
+    if (isProcessAlive(gatewayProcess.pid, "hermes")) return true;
+    gatewayProcess = null;
   }
   if (existsSync(PID_FILE)) {
     const pid = parseInt(readFileSync(PID_FILE, "utf-8").trim());
-    if (pid && !isNaN(pid)) {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        try { unlinkSync(PID_FILE); } catch {}
-      }
-    }
+    if (isProcessAlive(pid, "hermes")) return true;
+    try { unlinkSync(PID_FILE); } catch {}
   }
   return false;
 }
@@ -145,23 +166,13 @@ export async function stopGateway() {
 
 export function isDashboardRunning() {
   if (dashboardProcess && dashboardProcess.pid) {
-    try {
-      process.kill(dashboardProcess.pid, 0);
-      return true;
-    } catch {
-      dashboardProcess = null;
-    }
+    if (isProcessAlive(dashboardProcess.pid, "hermes")) return true;
+    dashboardProcess = null;
   }
   if (existsSync(DASHBOARD_PID_FILE)) {
     const pid = parseInt(readFileSync(DASHBOARD_PID_FILE, "utf-8").trim());
-    if (pid && !isNaN(pid)) {
-      try {
-        process.kill(pid, 0);
-        return true;
-      } catch {
-        try { unlinkSync(DASHBOARD_PID_FILE); } catch {}
-      }
-    }
+    if (isProcessAlive(pid, "hermes")) return true;
+    try { unlinkSync(DASHBOARD_PID_FILE); } catch {}
   }
   return false;
 }
@@ -177,16 +188,23 @@ export function getDashboardPid() {
 export async function startDashboard() {
   if (isDashboardRunning()) return { ok: true, message: "already running", pid: getDashboardPid(), port: DASHBOARD_PORT };
   if (!existsSync(HERMES_BIN)) return { ok: false, error: "hermes not installed yet" };
+
+  // 安全：启动前检测端口占用，避免启动在已被占用的端口上
+  if (await isPortInUse(DASHBOARD_PORT)) {
+    return { ok: false, error: `端口 ${DASHBOARD_PORT} 已被占用，请修改 HERMES_DASHBOARD_PORT 后重试` };
+  }
+
   const logFile = `${LOG_DIR}/dashboard.log`;
   const env = {
     ...process.env,
     HERMES_HOME: `${DATA_DIR}/home`,
-    HOME: `${DATA_DIR}/home`,
-    HERMES_DASHBOARD_INSECURE: "1"
+    HOME: `${DATA_DIR}/home`
+    // 移除 HERMES_DASHBOARD_INSECURE 与 --insecure，不再关闭安全校验
   };
+  // 安全：Dashboard 仅绑定 127.0.0.1，避免外部直接访问；面板通过反向代理或本机跳转打开
   dashboardProcess = Bun.spawn([
-    HERMES_BIN, "dashboard", "--host", "0.0.0.0", "--port", String(DASHBOARD_PORT),
-    "--insecure", "--skip-build", "--no-open"
+    HERMES_BIN, "dashboard", "--host", "127.0.0.1", "--port", String(DASHBOARD_PORT),
+    "--skip-build", "--no-open"
   ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
   processStartTimes.set(dashboardProcess.pid, Date.now());
   writeFileSync(DASHBOARD_PID_FILE, String(dashboardProcess.pid));

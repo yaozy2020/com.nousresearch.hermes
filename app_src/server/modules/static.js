@@ -1,9 +1,9 @@
 // @bun
-// 静态文件服务
+// 静态文件服务（安全加固版）
 import { existsSync, readFileSync } from "fs";
-import { extname, join, normalize } from "path";
+import { extname, join, resolve, sep } from "path";
 
-const STATIC_DIR = process.env.STATIC_DIR || "./ui";
+const STATIC_DIR = resolve(process.env.STATIC_DIR || "./ui");
 
 const MIME = {
   ".html": "text/html",
@@ -24,9 +24,23 @@ const MIME = {
   ".otf": "font/otf"
 };
 
+function isPathSafe(targetPath) {
+  // 必须位于 STATIC_DIR 下，且不含 NUL 字节
+  if (targetPath.includes("\0")) return false;
+  const resolved = resolve(targetPath);
+  return resolved === STATIC_DIR || resolved.startsWith(STATIC_DIR + sep);
+}
+
 export function serveStatic(pathname) {
-  const safe = normalize(pathname).replace(/^(\.\.[\/\\])+/, "");
-  const filePath = join(STATIC_DIR, safe === "/" ? "index.html" : safe);
+  // 去除可能的前导斜杠，统一基于 STATIC_DIR 解析
+  const clean = pathname.replace(/^\/+/, "");
+  const filePath = clean === "" ? STATIC_DIR : join(STATIC_DIR, clean);
+
+  // 安全：目录穿越防护
+  if (!isPathSafe(filePath)) {
+    return new Response("Forbidden", { status: 403 });
+  }
+
   if (!existsSync(filePath)) {
     const fallback = join(STATIC_DIR, "index.html");
     if (existsSync(fallback)) {
@@ -36,6 +50,7 @@ export function serveStatic(pathname) {
     }
     return new Response("Not found", { status: 404 });
   }
+
   const ext = extname(filePath).toLowerCase();
   return new Response(Bun.file(filePath), {
     headers: { "Content-Type": MIME[ext] || "application/octet-stream" }

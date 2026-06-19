@@ -21,6 +21,50 @@ function migrateConfigFile(name) {
 migrateConfigFile("config.yaml");
 migrateConfigFile(".env");
 
+// 需要脱敏显示的敏感字段（大小写不敏感匹配）
+const SENSITIVE_KEY_PATTERNS = [
+  /_API_KEY$/i,
+  /_TOKEN$/i,
+  /_SECRET$/i,
+  /_PASSWORD$/i,
+  /_PRIVATE_KEY$/i,
+  /_AUTH$/i,
+];
+const MASKED_VALUE = "__MASKED__";
+
+export function isSensitiveKey(key) {
+  return SENSITIVE_KEY_PATTERNS.some((re) => re.test(key));
+}
+
+export function maskEnvValues(text) {
+  if (!text) return text;
+  return text.split(/\r?\n/).map((raw) => {
+    const line = raw;
+    const eq = line.indexOf("=");
+    if (eq < 1) return line;
+    const k = line.slice(0, eq).trim();
+    if (!isSensitiveKey(k)) return line;
+    return `${k}=${MASKED_VALUE}`;
+  }).join("\n");
+}
+
+function unmaskEnvValues(newText, oldText) {
+  if (!newText) return newText;
+  const oldMap = parseEnvText(oldText || "");
+  const lines = newText.split(/\r?\n/);
+  return lines.map((raw) => {
+    const line = raw;
+    const eq = line.indexOf("=");
+    if (eq < 1) return line;
+    const k = line.slice(0, eq).trim();
+    const v = line.slice(eq + 1).trim();
+    if (isSensitiveKey(k) && v === MASKED_VALUE && oldMap[k] !== undefined) {
+      return `${k}=${oldMap[k]}`;
+    }
+    return line;
+  }).join("\n");
+}
+
 // 仅暴露"纯 .env 写入即生效"的频道字段；其他频道引导用户进 Hermes Web UI
 export const CHANNEL_FIELDS = {
   telegram: ["TELEGRAM_BOT_TOKEN", "TELEGRAM_ALLOWED_USERS", "TELEGRAM_HOME_CHANNEL"],
@@ -39,7 +83,8 @@ export function readConfig() {
     config.exists = true;
   }
   if (existsSync(envPath)) {
-    config.env = readFileSync(envPath, "utf-8");
+    // 安全：返回给前端的 .env 对敏感值脱敏
+    config.env = maskEnvValues(readFileSync(envPath, "utf-8"));
   }
   return config;
 }
@@ -47,8 +92,13 @@ export function readConfig() {
 export function writeConfig(yaml, env) {
   if (yaml !== undefined)
     writeFileSync(`${CONFIG_DIR}/config.yaml`, yaml);
-  if (env !== undefined)
-    writeFileSync(`${CONFIG_DIR}/.env`, env);
+  if (env !== undefined) {
+    const envPath = `${CONFIG_DIR}/.env`;
+    const oldText = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+    // 安全：若前端未修改敏感字段（仍为 __MASKED__），保留原值
+    const safeEnv = unmaskEnvValues(env, oldText);
+    writeFileSync(envPath, safeEnv);
+  }
   return { ok: true };
 }
 
@@ -86,7 +136,8 @@ export function readChannels() {
     out[chan] = {};
     let configured = false;
     for (const f of fields) {
-      out[chan][f] = env[f] || "";
+      const val = env[f] || "";
+      out[chan][f] = val && isSensitiveKey(f) ? MASKED_VALUE : val;
       if (env[f]) configured = true;
     }
     out[chan]._configured = configured;
@@ -104,11 +155,17 @@ export function writeChannel(name, values) {
   const fields = CHANNEL_FIELDS[name];
   for (const f of fields) {
     if (Object.prototype.hasOwnProperty.call(values, f)) {
-      const v = values[f];
+      let v = values[f];
       if (v === "" || v === null || v === undefined) {
         delete env[f];
       } else {
-        env[f] = String(v);
+        v = String(v);
+        // 安全：未修改的敏感字段保留原值
+        if (isSensitiveKey(f) && v === MASKED_VALUE && env[f] !== undefined) {
+          // keep old
+        } else {
+          env[f] = v;
+        }
       }
     }
   }

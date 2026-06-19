@@ -9,7 +9,9 @@ const HERMES_BIN = process.env.HERMES_BIN || `${VENV_DIR}/bin/hermes`;
 const CONFIG_DIR = `${DATA_DIR}/config`;
 const RUNTIME_DIR = `${DATA_DIR}/runtime`;
 const BIN_DIR = process.env.HERMES_PANEL_BIN || (process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/bin` : "./bin");
+const SERVER_DIR = process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/server/modules` : `${import.meta.dir}`;
 const TTYD_BIN = `${BIN_DIR}/ttyd`;
+const SHELL_SCRIPT = `${SERVER_DIR}/terminal-shell.js`;
 const TERM_PORT_PREFERRED = parseInt(process.env.HERMES_TERM_PORT || "9123");
 const TERM_BIND = process.env.HERMES_TERM_BIND || "127.0.0.1";
 const TERM_PID_FILE = `${RUNTIME_DIR}/ttyd.pid`;
@@ -174,6 +176,9 @@ export async function startTtyd(cmdKey, options = {}) {
   };
 
   logTtyd(`starting ttyd on ${TERM_BIND}:${port} for hermes ${cmdArgs.join(" ")}`);
+
+  // 安全：通过受限 shell 包装器启动 hermes，禁止任意命令注入
+  const shellArgs = [SHELL_SCRIPT, "hermes", ...cmdArgs];
   ttydProcess = Bun.spawn([
     TTYD_BIN,
     "-p", String(port),
@@ -182,8 +187,8 @@ export async function startTtyd(cmdKey, options = {}) {
     "-W",
     "-t", `fontSize=${fontSize}`,
     "-t", "theme={\"background\":\"#0d1117\",\"foreground\":\"#c9d1d9\"}",
-    HERMES_BIN,
-    ...cmdArgs
+    "bun",
+    ...shellArgs
   ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
 
   if (!ttydProcess?.pid) {

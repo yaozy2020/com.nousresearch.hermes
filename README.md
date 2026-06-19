@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.24.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.24.1)
+[![Version](https://img.shields.io/badge/version-0.25.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,8 +109,21 @@ bash build.sh
 
 ## 版本历史
 
+### v0.25.0（当前版本）
 
-### v0.24.1（当前版本）
+安全加固与稳定性改进：
+
+- **Web 终端沙箱化**：新增受限命令包装器 `terminal-shell.js`，ttyd 仅允许执行白名单 `hermes` 子命令，禁止 shell 元字符与任意命令注入
+- **敏感配置脱敏**：`.env` 中 API Key / Token / Secret 等敏感值返回前端时显示为 `__MASKED__`，未修改时保留原值；频道表单已使用密码输入框
+- **Dashboard 安全模式**：移除 `--insecure`，Dashboard 仅绑定 `127.0.0.1`，避免外部直接访问
+- **端口冲突检测**：启动 Dashboard 前检测端口占用，被占用时给出明确错误
+- **API 来源校验**：所有写操作与终端路径增加 `Origin` / `Referer` 校验，防止跨站请求伪造
+- **静态文件路径安全**：`serveStatic` 改用 `resolve` + 前缀白名单，彻底防御目录穿越
+- **卸载安全加固**：删除数据前校验路径必须位于 `/var/apps/` 或 `/vol2/@apphome/`，防止误删系统目录
+- **进程管理加锁**：`isGatewayRunning` / `isDashboardRunning` 增加 `/proc/<pid>/cmdline` 进程名校验，避免旧 PID 指向其他进程
+- **日志轮转**：`gateway.log` 按天分割为 `gateway-YYYY-MM-DD.log`，自动保留最近 7 天
+
+### v0.24.1
 
 v0.24 系列正式版，在 v0.23.9 基础上进一步打磨移动端体验、安装向导与信息展示：
 

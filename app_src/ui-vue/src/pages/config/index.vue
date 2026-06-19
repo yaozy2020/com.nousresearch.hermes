@@ -109,6 +109,9 @@ onMounted(loadConfig)
         </UFormField>
         <UFormField label=".env">
           <UTextarea v-model="env" :rows="10" class="w-full font-mono text-sm" placeholder="# 环境变量 (KEY=VALUE)" />
+          <p class="text-xs text-[var(--ui-text-muted)] mt-1">
+            安全提示：API Key / Token 等敏感值已脱敏显示为 __MASKED__，未修改时不会覆盖原值。
+          </p>
         </UFormField>
       </div>
       <div class="flex flex-wrap gap-2 mt-5">

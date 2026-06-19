@@ -13,6 +13,17 @@ log "wizard_delete_data=${wizard_delete_data:-<unset>}"
 DATA_DIR="${TRIM_PKGHOME}/data"
 APP_DIR="${TRIM_APPDEST}"
 
+# 安全：DATA_DIR 必须位于受控路径下，防止配置错误导致误删系统目录
+is_safe_data_dir() {
+  local d="$1"
+  case "$d" in
+    /var/apps/*/home/data|/vol2/@apphome/*/home/data|/var/packages/*/home/data)
+      return 0
+      ;;
+  esac
+  return 1
+}
+
 # 0) 兜底：socket / pid 一律清理
 rm -f "${APP_DIR}/com.nousresearch.hermes.sock" 2>/dev/null
 rm -f "${APP_DIR}"/*.sock 2>/dev/null
@@ -20,34 +31,40 @@ rm -f "${DATA_DIR}/runtime/"*.pid 2>/dev/null
 
 # 1) 用户选择保留 → 直接退出
 if [ "${wizard_delete_data}" != "true" ]; then
-    log "User chose to keep data, leaving DATA_DIR untouched: ${DATA_DIR}"
-    log "=== uninstall_callback done (data kept) ==="
-    exit 0
+  log "User chose to keep data, leaving DATA_DIR untouched: ${DATA_DIR}"
+  log "=== uninstall_callback done (data kept) ==="
+  exit 0
 fi
 
-# 2) 用户选择清除 → 完整删除
+# 2) 用户选择清除 → 校验路径安全后完整删除
 log "User chose to delete ALL data, wiping ${DATA_DIR} ..."
 
+if ! is_safe_data_dir "$DATA_DIR"; then
+  log "ERROR: DATA_DIR ${DATA_DIR} is not in allowed paths. Aborting delete for safety."
+  log "=== uninstall_callback done (aborted) ==="
+  exit 1
+fi
+
 if [ -d "$DATA_DIR" ]; then
-    # 列出磁盘占用，便于事后核对
-    DU=$(du -sh "$DATA_DIR" 2>/dev/null | awk '{print $1}')
-    log "Data dir size before delete: $DU"
+  # 列出磁盘占用，便于事后核对
+  DU=$(du -sh "$DATA_DIR" 2>/dev/null | awk '{print $1}')
+  log "Data dir size before delete: $DU"
 
-    # 逐个子目录删除（更稳，避免一次 rm -rf 整个 home 误伤）
-    for SUB in venv .hermes home config logs workspace runtime state install; do
-        TARGET="${DATA_DIR}/${SUB}"
-        if [ -e "$TARGET" ]; then
-            log "  removing ${TARGET} ..."
-            rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
-        fi
-    done
+  # 逐个子目录删除（更稳，避免一次 rm -rf 整个 home 误伤）
+  for SUB in venv .hermes home config logs workspace runtime state install; do
+    TARGET="${DATA_DIR}/${SUB}"
+    if [ -e "$TARGET" ]; then
+      log "  removing ${TARGET} ..."
+      rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
+    fi
+  done
 
-    # 删除任何残留的隐藏配置（.env / .hermes_*）
-    rm -rf "${DATA_DIR}"/.env 2>/dev/null
-    rm -rf "${DATA_DIR}"/.hermes_* 2>/dev/null
+  # 删除任何残留的隐藏配置（.env / .hermes_*）
+  rm -rf "${DATA_DIR}"/.env 2>/dev/null
+  rm -rf "${DATA_DIR}"/.hermes_* 2>/dev/null
 
-    # 最后尝试删空 data 目录本身
-    rmdir "$DATA_DIR" 2>/dev/null || log "DATA_DIR not empty, leaving for fnOS to clean"
+  # 最后尝试删空 data 目录本身
+  rmdir "$DATA_DIR" 2>/dev/null || log "DATA_DIR not empty, leaving for fnOS to clean"
 fi
 
 log "=== uninstall_callback done (data wiped) ==="
