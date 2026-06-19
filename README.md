@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.23.8-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases)
+[![Version](https://img.shields.io/badge/version-0.23.9-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.23.9)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,33 +110,31 @@ bash build.sh
 ## 版本历史
 
 
-### v0.23.8（当前版本）
+### v0.23.9（当前版本）
 
-- **安装向导支持返回上一步**：步骤 3（启动 Gateway）和步骤 4（启动 Dashboard）均增加「上一步」按钮，可返回修改 Provider 或检查安装状态
+0.23.x 统一版本，集中包含以下改进与修复：
 
-### v0.23.7
-
-- **修复高级配置不生效**：配置目录从 `${DATA_DIR}/config` 对齐到 Hermes 实际读取的 `HERMES_HOME`（即 `~/.hermes`）
-  - `config.yaml` / `.env` 现在写入 `${HERMES_HOME}/`，保存后重启 Gateway 即可被 Hermes 正确加载
-  - 启动时自动把旧位置（`${DATA_DIR}/config/`）的配置迁移到新位置
-- **清理 Gateway / Dashboard 环境变量**：移除未使用的 `HERMES_CONFIG`、`HERMES_DATA`、`HERMES_WORKSPACE`，避免误导
-
-### v0.23.6
-
-- **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口；新增 `/ttyd-mobile` 全屏移动端终端壳；桌面端保留新标签页打开，移动端自动跳转移动壳
+- **CLI 终端移动端适配**：ttyd 改由主应用统一代理（`/ttyd/*` 反向代理 HTTP + WebSocket），无需直接访问 9123 端口
+- **新增移动端全屏终端壳**：`/ttyd-mobile` 针对小屏优化 viewport、安全区、字体与工具条
+- **特殊键工具条**：支持 Ctrl+C / Tab / Esc / 方向键 / 粘贴，解决手机浏览器缺少功能键的痛点
 - **修复 ttyd 终端黑屏/白屏**：移除 `--once`/`-O` 限制、重写 `Location` 避免 127.0.0.1 跳转、修复 WebSocket subprotocol、自动寻找可用端口、统一带斜杠访问 `/ttyd/`
-- **修复版本信息显示**：构建时将 Panel 版本写入 `build-meta.json`，运行时优先读取；Hermes 版本通过 `hermes --version` 异步读取并正则提取纯版本号
-- **状态总览增强**：新增 installing 状态、Gateway/Dashboard/Terminal 运行时间、Terminal 状态卡片；未运行改用 power-off 图标，运行中增加心跳动画
+- **修复版本信息显示**：构建时将 Panel 版本写入 `build-meta.json`；Hermes 版本通过 `hermes --version` 异步读取并正则提取纯版本号
+- **状态总览增强**：新增 installing 状态、Gateway/Dashboard/Terminal 运行时间、Terminal 状态卡片
+- **修复高级配置不生效**：配置目录对齐到 Hermes 实际读取的 `HERMES_HOME`（`~/.hermes`），保存 `config.yaml` / `.env` 后重启 Gateway 即可生效；启动时自动迁移旧配置
+- **安装向导改进**：步骤 3/4 增加「上一步」按钮
+- **状态卡片视觉统一**：4 张卡片等高开齐，路径单行截断显示；未运行改用 power-off 图标，运行中 activity 图标增加心跳动画
 
-| 能力 | v0.22.0 | v0.23.6 |
+| 能力 | v0.22.0 | v0.23.9 |
 |------|:-------:|:-------:|
-| 前端 UI | Vue 3 + Nuxt UI v4 重构 | 同上 + 状态卡片心跳动画 |
-| CLI 终端 | 桌面端新标签页打开 | 桌面端 + 移动端全屏壳 |
+| 前端 UI | Vue 3 + Nuxt UI v4 重构 | 同上 + 状态卡片统一布局 |
+| CLI 终端 | 桌面端新标签页打开 | 桌面端 + 移动端全屏壳 + 特殊键工具条 |
 | ttyd 连接 | 直接访问 9123 端口 | 主应用 `/ttyd/*` 反向代理 |
 | 版本显示 | Panel 可能 unknown | 构建时注入 `build-meta.json`，稳定显示 |
 | 安装状态 | 仅显示已安装/未安装 | 增加「安装中…」状态 |
 | 进程信息 | PID + 运行中/未运行 | 增加运行时间、Terminal 卡片 |
-| 响应式 | 桌面 + 移动布局 | 终端页单独移动端适配 |
+| 配置生效 | 高级配置写入错误路径 | 对齐 `HERMES_HOME`，保存后生效 |
+| 响应式 | 桌面 + 移动布局 | 终端页单独移动端适配、向导可返回 |
+
 ### v0.22.0
 
 - **前端 UI 全面重构**：基于 Vue 3 + Nuxt UI v4 + TailwindCSS v4 重写控制面板，复用 QwenPaw 控制台设计语言，视觉与 fnOS 系统更统一

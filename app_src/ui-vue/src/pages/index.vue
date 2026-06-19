@@ -201,7 +201,7 @@ onUnmounted(() => {
     </div>
 
     <!-- 状态卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch auto-rows-fr">
       <StatusCard
         icon="i-lucide-layers"
         title="Hermes 安装"
@@ -211,9 +211,9 @@ onUnmounted(() => {
         :status-animated="hermes?.installing"
       >
         <template v-if="hermes?.installed && hermes.bin" #footer>
-          <div class="flex flex-col gap-0.5">
-            <span class="text-[var(--ui-text-muted)]">路径</span>
-            <span class="font-mono text-[var(--ui-text)] break-all leading-tight">{{ hermes.bin }}</span>
+          <div class="flex items-center gap-1 min-w-0">
+            <span class="text-[var(--ui-text-muted)] shrink-0">路径</span>
+            <span class="font-mono text-[var(--ui-text)] truncate" :title="hermes.bin">{{ hermes.bin }}</span>
           </div>
         </template>
         <template #actions>
