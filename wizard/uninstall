@@ -9,21 +9,21 @@
       "type": "switch",
       "field": "wizard_keep_config",
       "label": "保留配置文件",
-      "initValue": true,
+      "initValue": "true",
       "helpText": "保留 config.yaml、.env、SOUL.md 等配置，下次安装后无需重新设置。"
     },
     {
       "type": "switch",
       "field": "wizard_keep_runtime",
       "label": "保留运行环境",
-      "initValue": true,
+      "initValue": "true",
       "helpText": "保留 venv、已下载模型、运行时状态与日志，下次安装可复用。"
     },
     {
       "type": "switch",
       "field": "wizard_confirm_uninstall",
       "label": "我已了解风险，确认卸载",
-      "initValue": false
+      "initValue": "false"
     }
   ]
 }]

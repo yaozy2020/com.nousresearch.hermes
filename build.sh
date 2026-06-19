@@ -108,24 +108,23 @@ if [ ! -f "$APP_SRC/ui/index.html" ]; then
   exit 1
 fi
 
-# 3. 打包 app.tgz (server + ui + bin)
-echo "[3/6] 打包 app.tgz ..."
-cd "$APP_SRC"
+# 3. 准备 fnpack 所需的 app 目录（server + ui + bin）
+echo "[3/6] 准备 app 目录 ..."
 # 验证 ttyd 二进制存在
 if [ ! -x "$APP_SRC/bin/ttyd" ]; then
   echo -e "${RED}ERROR: $APP_SRC/bin/ttyd 不存在或不可执行，无法打包${NC}"
   exit 1
 fi
-tar czf "$BUILD_DIR/app.tgz" --exclude='*.bak' server ui bin
-cd "$PROJ_DIR"
+# 清理并复制运行时所需的最小集合（不要源码和 node_modules）
+APP_DIR="$BUILD_DIR/app"
+rm -rf "$APP_DIR"
+mkdir -p "$APP_DIR"
+cp -a "$APP_SRC/server" "$APP_DIR/"
+cp -a "$APP_SRC/ui" "$APP_DIR/"
+cp -a "$APP_SRC/bin" "$APP_DIR/"
 
-# 4. 计算 checksum
-echo "[4/6] 计算 checksum ..."
-CHECKSUM=$(md5sum "$BUILD_DIR/app.tgz" | awk '{print $1}')
-echo "  checksum = $CHECKSUM"
-
-# 5. 复制文件到 build 目录
-echo "[5/6] 复制文件 ..."
+# 4. 复制 manifest / ICON / cmd / config / wizard 到 build 目录
+echo "[4/5] 复制元数据与回调脚本 ..."
 cp "$PROJ_DIR/manifest" "$BUILD_DIR/"
 cp "$PROJ_DIR/ICON.PNG" "$BUILD_DIR/"
 cp "$PROJ_DIR/ICON_256.PNG" "$BUILD_DIR/"
@@ -133,20 +132,19 @@ cp -a "$PROJ_DIR/cmd" "$BUILD_DIR/"
 cp -a "$PROJ_DIR/config" "$BUILD_DIR/"
 cp -a "$PROJ_DIR/wizard" "$BUILD_DIR/"
 
-# 更新 manifest 中的 checksum
-sed -i "s/^checksum.*/checksum              = $CHECKSUM/" "$BUILD_DIR/manifest"
-
-# 6. 打包 fpk
-echo "[6/6] 打包 fpk ..."
+# 5. 使用 fnpack 打包 fpk
+echo "[5/5] 使用 fnpack 打包 ..."
+if ! command -v fnpack >/dev/null 2>&1; then
+  echo -e "${RED}ERROR: 未找到 fnpack 命令，无法生成有效 fpk${NC}"
+  exit 1
+fi
 cd "$BUILD_DIR"
-tar czf "$OUTPUT" manifest ICON.PNG ICON_256.PNG app.tgz cmd config wizard
+fnpack build -d "$BUILD_DIR"
 cd "$PROJ_DIR"
+mv -f "$BUILD_DIR/com.nousresearch.hermes.fpk" "$OUTPUT"
 
 # 验证
 echo ""
 echo -e "${GREEN}===== 打包完成 =====${NC}"
 echo "输出: $OUTPUT"
 ls -lh "$OUTPUT"
-echo ""
-echo "fpk 内容:"
-tar tzf "$OUTPUT"
