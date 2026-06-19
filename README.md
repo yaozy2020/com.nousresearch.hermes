@@ -115,7 +115,7 @@ bash build.sh
 
 - **Web 终端沙箱化**：新增受限命令包装器 `terminal-shell.js`，ttyd 仅允许执行白名单 `hermes` 子命令，禁止 shell 元字符与任意命令注入
 - **敏感配置脱敏**：`.env` 中 API Key / Token / Secret 等敏感值返回前端时显示为 `__MASKED__`，未修改时保留原值；频道表单已使用密码输入框
-- **Dashboard 安全模式**：移除 `--insecure`，Dashboard 仅绑定 `127.0.0.1`，避免外部直接访问
+- **Dashboard 安全模式**：移除 `--insecure`，恢复 Hermes Dashboard 自身的安全校验；绑定 `0.0.0.0` 以便在 fnOS 内网直接访问
 - **端口冲突检测**：启动 Dashboard 前检测端口占用，被占用时给出明确错误
 - **API 来源校验**：所有写操作与终端路径增加 `Origin` / `Referer` 校验，防止跨站请求伪造
 - **静态文件路径安全**：`serveStatic` 改用 `resolve` + 前缀白名单，彻底防御目录穿越

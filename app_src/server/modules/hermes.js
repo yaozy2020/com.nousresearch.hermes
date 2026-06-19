@@ -201,9 +201,10 @@ export async function startDashboard() {
     HOME: `${DATA_DIR}/home`
     // 移除 HERMES_DASHBOARD_INSECURE 与 --insecure，不再关闭安全校验
   };
-  // 安全：Dashboard 仅绑定 127.0.0.1，避免外部直接访问；面板通过反向代理或本机跳转打开
+  // 安全：移除 --insecure，让 Hermes Dashboard 自身的安全校验生效；
+  // 绑定 0.0.0.0 以便在 fnOS 内网中通过浏览器直接访问（受 Dashboard 自身认证保护）
   dashboardProcess = Bun.spawn([
-    HERMES_BIN, "dashboard", "--host", "127.0.0.1", "--port", String(DASHBOARD_PORT),
+    HERMES_BIN, "dashboard", "--host", "0.0.0.0", "--port", String(DASHBOARD_PORT),
     "--skip-build", "--no-open"
   ], { env, stdout: "pipe", stderr: "pipe", cwd: DATA_DIR });
   processStartTimes.set(dashboardProcess.pid, Date.now());
