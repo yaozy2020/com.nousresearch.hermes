@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.25.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.0)
+[![Version](https://img.shields.io/badge/version-0.25.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.2)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,13 +109,13 @@ bash build.sh
 
 ## 版本历史
 
-### v0.25.0（当前版本）
+### v0.25.2（当前版本）
 
 安全加固与稳定性改进：
 
-- **Web 终端沙箱化**：新增受限命令包装器 `terminal-shell.js`，ttyd 仅允许执行白名单 `hermes` 子命令，禁止 shell 元字符与任意命令注入
+- **Web 终端沙箱化**：新增受限命令包装器 `terminal-shell.js`，ttyd 仅允许执行白名单 `hermes` 子命令，禁止 shell 元字符与任意命令注入；修复 Ctrl+C 不能正常中断的问题
 - **敏感配置脱敏**：`.env` 中 API Key / Token / Secret 等敏感值返回前端时显示为 `__MASKED__`，未修改时保留原值；频道表单已使用密码输入框
-- **Dashboard 安全模式**：移除 `--insecure`，恢复 Hermes Dashboard 自身的安全校验；绑定 `0.0.0.0` 以便在 fnOS 内网直接访问
+- **Dashboard 安全模式**：默认绑定 `127.0.0.1`，不直接暴露无认证 Dashboard 到网络；如需外部访问，请在 `.env` 中显式设置 `HERMES_DASHBOARD_INSECURE=1` 并重启应用
 - **端口冲突检测**：启动 Dashboard 前检测端口占用，被占用时给出明确错误
 - **API 来源校验**：所有写操作与终端路径增加 `Origin` / `Referer` 校验，防止跨站请求伪造
 - **静态文件路径安全**：`serveStatic` 改用 `resolve` + 前缀白名单，彻底防御目录穿越
@@ -264,6 +264,21 @@ Hermes 安装在独立用户目录下的虚拟环境中：`/vol2/@apphome/com.no
 v0.20.1 起卸载向导完整支持「保留 / 清除」两种模式：
 - **保留现有文件**：仅停服务并清理 socket/pid，data 目录原样保留
 - **清除所有应用数据**：彻底删除 venv、.hermes、config、logs、workspace、runtime、state 等子目录
+
+### 如何开启 Dashboard 外部访问？
+
+v0.25.2 起 Dashboard 默认仅监听 `127.0.0.1`（安全模式），不会直接暴露在局域网中。如果你确实需要浏览器直接访问 `http://nas:9119`：
+
+1. 打开 Hermes 面板 → **配置**
+2. 在 `.env` 编辑框末尾添加：
+   ```bash
+   HERMES_DASHBOARD_INSECURE=1
+   ```
+3. 点「保存」
+4. 到 **fnOS 应用中心**停止并重新启动 Hermes 应用（面板后端启动时才读取 `.env`）
+5. 回到面板，Dashboard 状态卡片会显示「外部访问模式」，此时「打开」按钮可直接跳转 `http://nas:9119`
+
+> ⚠️ 注意：开启后 Dashboard 将绑定 `0.0.0.0:9119` 且无认证，建议仅在受信任的家庭内网使用；公网映射或多人共用网络请勿启用。
 
 ### 亮暗模式不跟随飞牛系统？
 

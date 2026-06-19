@@ -119,6 +119,20 @@ onMounted(loadConfig)
           <p class="text-xs text-[var(--ui-text-muted)] mt-1">
             安全提示：API Key / Token 等敏感值已脱敏显示为 __MASKED__，未修改时不会覆盖原值。
           </p>
+          <UAlert class="mt-3" color="warning" variant="soft" icon="i-lucide-shield-alert" title="开启 Dashboard 外部访问（不安全模式）">
+            <template #description>
+              <div class="space-y-1 text-xs">
+                <p>默认 Dashboard 仅监听 127.0.0.1。如需浏览器直接访问 <code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">http://nas:9119</code>，请执行以下步骤：</p>
+                <ol class="list-decimal list-inside space-y-0.5">
+                  <li>在本页 .env 末尾添加：<code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">HERMES_DASHBOARD_INSECURE=1</code></li>
+                  <li>点「保存」</li>
+                  <li>到 fnOS 应用中心停止并重新启动 Hermes 应用</li>
+                  <li>回到面板，Dashboard 状态会变为「外部访问模式」</li>
+                </ol>
+                <p class="text-[var(--ui-text-muted)]">注意：开启后 Dashboard 将无认证暴露在局域网，公网/多用户环境请勿启用。</p>
+              </div>
+            </template>
+          </UAlert>
         </UFormField>
       </div>
       <div class="flex flex-wrap gap-2 mt-5">
