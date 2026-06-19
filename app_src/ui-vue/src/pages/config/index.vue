@@ -69,13 +69,20 @@ async function restartGateway() {
 
 async function openDashboard() {
   try {
-    const s = await api<{ port?: number }>('api/dashboard/status')
-    const port = s.port || 9119
+    const s = await api<{ running: boolean; port?: number; dashboardInsecure?: boolean }>('api/health')
+    if (!s.dashboardRunning) {
+      notify('Dashboard 未运行，请先启动', 'info')
+      return
+    }
+    if (!s.dashboardInsecure) {
+      notify('当前为安全模式，Dashboard 仅监听本地地址。如需浏览器直接访问，请在 .env 中添加 HERMES_DASHBOARD_INSECURE=1 并重启应用。', 'info')
+      return
+    }
+    const port = s.dashboardPort || 9119
     const host = window.location.hostname || 'localhost'
     window.open(`http://${host}:${port}`, '_blank', 'noopener')
   } catch {
-    const host = window.location.hostname || 'localhost'
-    window.open(`http://${host}:9119`, '_blank', 'noopener')
+    notify('无法获取 Dashboard 状态', 'error')
   }
 }
 
@@ -90,7 +97,7 @@ onMounted(loadConfig)
     </div>
 
     <UAlert color="info" variant="soft" icon="i-lucide-info" title="提示"
-      description="推荐使用官方 Dashboard 配置 Provider 和 Channel，本页适合手动调整边缘参数。">
+      description="推荐使用官方 Dashboard 配置 Provider 和 Channel，本页适合手动调整边缘参数。Dashboard 默认仅监听 127.0.0.1，如需直接通过浏览器访问，请在 .env 中添加 HERMES_DASHBOARD_INSECURE=1 并重启应用。">
       <template #actions>
         <UButton color="primary" size="sm" @click="openDashboard">打开 Dashboard</UButton>
       </template>

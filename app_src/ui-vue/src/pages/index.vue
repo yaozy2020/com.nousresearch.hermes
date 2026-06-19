@@ -22,6 +22,7 @@ interface DashboardStatus {
   pid?: number
   uptime?: string
   port?: number
+  insecure?: boolean
 }
 
 interface TerminalSummary {
@@ -67,7 +68,7 @@ async function refreshOverview(notify = false) {
     }
     hermes.value = { installed: health.hermesInstalled, installing: health.hermesInstalling, bin: health.bin }
     gateway.value = { running: health.gatewayRunning, pid: health.gatewayPid ?? undefined, uptime: health.gatewayUptime ?? undefined, version: health.version }
-    dashboard.value = { running: health.dashboardRunning, pid: health.dashboardPid ?? undefined, uptime: health.dashboardUptime ?? undefined, port: health.dashboardPort }
+    dashboard.value = { running: health.dashboardRunning, pid: health.dashboardPid ?? undefined, uptime: health.dashboardUptime ?? undefined, port: health.dashboardPort, insecure: health.dashboardInsecure }
     terminal.value = { running: health.ttydRunning, pid: health.ttydPid ?? undefined, uptime: health.ttydUptime ?? undefined, port: health.ttydPort ?? undefined }
     const lines = l.lines || []
     recentLogs.value = lines.length ? lines.join('\n') : '暂无日志'
@@ -152,8 +153,15 @@ async function openDashboard() {
       showNotification('Dashboard 未运行，请先启动', 'warning')
       return
     }
-    const proxyPath = '/app/com-nousresearch-hermes/api/dashboard/proxy/'
-    window.open(proxyPath, '_blank', 'noopener')
+    // 默认安全模式：Dashboard 绑定 127.0.0.1，不直接暴露到网络
+    // 只有显式开启 HERMES_DASHBOARD_INSECURE=1 时才允许外部直接访问
+    if (!dashboard.value?.insecure) {
+      showNotification('当前为安全模式，Dashboard 仅监听本地地址。如需浏览器直接访问，请在配置中开启不安全模式。', 'info')
+      return
+    }
+    const host = window.location.hostname || 'localhost'
+    const port = s.port || 9119
+    window.open(`http://${host}:${port}`, '_blank', 'noopener')
   } catch {
     showNotification('无法获取 Dashboard 状态', 'error')
   }
@@ -235,12 +243,14 @@ onUnmounted(() => {
         :title="dashboard ? (dashboard.running ? '运行中' : '未运行') : '检查中…'"
         :badge="dashboard ? (dashboard.running ? 'Active' : 'Inactive') : 'Checking'"
         :color="dashboard ? (dashboard.running ? 'success' : 'neutral') : 'neutral'"
-        :subtitle="dashboard?.running ? `端口 ${dashboard.port || '-'} · v${hermesVersion}` : 'Dashboard Web UI'"
+        :subtitle="dashboard?.running ? `${dashboard.insecure ? '外部访问模式' : '本地安全模式'} · 端口 ${dashboard.port || '-'}` : 'Dashboard Web UI'"
       >
         <template #actions>
           <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
-          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">
+            {{ dashboard?.running && !dashboard?.insecure ? '本地模式' : '打开' }}
+          </UButton>
         </template>
       </StatusCard>
 

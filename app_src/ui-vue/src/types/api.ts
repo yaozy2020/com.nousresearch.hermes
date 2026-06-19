@@ -27,6 +27,7 @@ export interface HealthResponse {
   ttydPid: number | null
   ttydUptime: string | null
   ttydPort: number | null
+  dashboardInsecure: boolean
   version: VersionInfo
 }
 
