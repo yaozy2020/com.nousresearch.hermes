@@ -50,7 +50,6 @@ const timer = ref<number | null>(null)
 
 const panelVersion = computed(() => gateway.value?.version?.panel || '-')
 const hermesVersion = computed(() => gateway.value?.version?.hermes || '-')
-const dashboardVersion = computed(() => gateway.value?.version?.dashboard || hermesVersion.value)
 
 async function refreshOverview(notify = false) {
   loading.value = true
@@ -233,7 +232,7 @@ onUnmounted(() => {
         :title="hermes ? (hermes.installed ? '已安装' : hermes.installing ? '安装中…' : '未安装') : '检查中…'"
         :badge="hermes ? (hermes.installed ? 'Installed' : hermes.installing ? 'Installing' : 'Not Installed') : 'Checking'"
         :color="hermes ? (hermes.installed ? 'success' : hermes.installing ? 'warning' : 'neutral') : 'neutral'"
-        :subtitle="hermes?.installed ? `Hermes / Dashboard v${hermesVersion}` : 'Hermes AI 助手运行环境'"
+        :subtitle="hermes?.installed ? `Hermes   v${hermesVersion}\nDashboard v${hermesVersion}` : 'Hermes AI 助手运行环境'"
       >
         <template #actions>
           <UButton v-if="!hermes?.installed && !hermes?.installing" color="primary" size="sm" @click="installHermes">一键安装</UButton>
@@ -301,10 +300,6 @@ onUnmounted(() => {
           <div class="flex justify-between">
             <span class="text-[var(--ui-text-muted)]">Hermes</span>
             <span class="font-mono text-[var(--ui-text)]">{{ hermesVersion }}</span>
-          </div>
-          <div class="flex justify-between">
-            <span class="text-[var(--ui-text-muted)]">Dashboard</span>
-            <span class="font-mono text-[var(--ui-text)]">{{ dashboardVersion }}</span>
           </div>
         </div>
       </UCard>
