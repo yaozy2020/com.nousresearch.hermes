@@ -1,6 +1,6 @@
 {
   "name": "com.nousresearch.hermes",
-  "version": "0.25.8",
+  "version": "0.26.0",
   "type": "module",
   "private": true,
   "scripts": {
