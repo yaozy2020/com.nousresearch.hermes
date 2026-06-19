@@ -4,7 +4,7 @@ import { api } from '@/composables/useApi'
 
 interface HermesStatus { installed: boolean; bin?: string }
 interface GatewayStatus { running: boolean; pid?: number }
-interface DashboardStatus { running: boolean; pid?: number; port?: number }
+interface DashboardStatus { running: boolean; pid?: number; port?: number; insecure?: boolean }
 interface ConfigResponse { yaml?: string; env?: string }
 
 const toast = useToast()
@@ -184,12 +184,19 @@ async function startDashboard() {
 async function openDashboard() {
   try {
     const s = await api<DashboardStatus>('api/dashboard/status')
+    if (!s.running) {
+      notify('Dashboard 未运行，请先启动', 'info')
+      return
+    }
+    if (!s.insecure) {
+      notify('当前为安全模式，Dashboard 仅监听本地地址。如需浏览器直接访问，请在 .env 中添加 HERMES_DASHBOARD_INSECURE=1 并重启应用。', 'info')
+      return
+    }
     const port = s.port || 9119
     const host = window.location.hostname || 'localhost'
     window.open(`http://${host}:${port}`, '_blank', 'noopener')
   } catch {
-    const host = window.location.hostname || 'localhost'
-    window.open(`http://${host}:9119`, '_blank', 'noopener')
+    notify('无法获取 Dashboard 状态', 'error')
   }
 }
 

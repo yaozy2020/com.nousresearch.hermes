@@ -1,6 +1,6 @@
 // @bun
 // 配置与消息频道管理（config.yaml / .env）
-import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync } from "fs";
+import { existsSync, readFileSync, writeFileSync, copyFileSync, mkdirSync, chmodSync } from "fs";
 import { swallowError } from "./error.js";
 
 const DATA_DIR = process.env.HERMES_DATA_DIR || "/var/apps/com.nousresearch.hermes/home/data";
@@ -93,14 +93,18 @@ export function readConfig() {
 }
 
 export function writeConfig(yaml, env) {
-  if (yaml !== undefined)
-    writeFileSync(`${CONFIG_DIR}/config.yaml`, yaml);
+  if (yaml !== undefined) {
+    const p = `${CONFIG_DIR}/config.yaml`;
+    writeFileSync(p, yaml);
+    try { chmodSync(p, 0o640); } catch {}
+  }
   if (env !== undefined) {
     const envPath = `${CONFIG_DIR}/.env`;
     const oldText = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
     // 安全：若前端未修改敏感字段（仍为 __MASKED__），保留原值
     const safeEnv = unmaskEnvValues(env, oldText);
     writeFileSync(envPath, safeEnv);
+    try { chmodSync(envPath, 0o640); } catch {}
   }
   return { ok: true };
 }
@@ -173,6 +177,7 @@ export function writeChannel(name, values) {
     }
   }
   writeFileSync(envPath, serializeEnv(env));
+  try { chmodSync(envPath, 0o640); } catch {}
   return { ok: true, channel: name, configured: fields.some((f) => env[f]) };
 }
 
@@ -185,5 +190,6 @@ export function deleteChannel(name) {
   const env = parseEnvText(text);
   for (const f of CHANNEL_FIELDS[name]) delete env[f];
   writeFileSync(envPath, serializeEnv(env));
+  try { chmodSync(envPath, 0o640); } catch {}
   return { ok: true, channel: name };
 }

@@ -6,6 +6,8 @@ import { wsClients, readLogs, log } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
 import { serveStatic } from "./modules/static.js";
 import { getVersion } from "./modules/version.js";
+import { errorResponse } from "./modules/error.js";
+import { isSafeWriteRequest } from "./modules/security.js";
 import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
@@ -96,44 +98,6 @@ async function proxyTerminalHttp(req, pathname) {
   }
 }
 
-function isSafeWriteRequest(req) {
-  // 写操作增加 CSRF/来源校验。fnOS 网关已做登录认证，这里只校验请求来源。
-  const method = req.method;
-  if (method === "GET" || method === "HEAD" || method === "OPTIONS") return true;
-
-  const origin = req.headers.get("origin");
-  const referer = req.headers.get("referer");
-
-  // 无 Origin 且同域 Referer 是本地文件/直接请求：允许（无法伪造的受限场景）
-  if (!origin && !referer) return true;
-
-  // 允许 Origin: null（iframe sandbox / 本地文件场景）
-  if (origin === "null") return true;
-
-  const expectedHosts = new Set();
-  try {
-    const url = new URL(req.url);
-    expectedHosts.add(url.host);
-  } catch {}
-
-  for (const header of [origin, referer]) {
-    if (!header) continue;
-    try {
-      const h = new URL(header);
-      // 允许同源，或来自 fnOS 网关路径
-      if (expectedHosts.has(h.host) || h.pathname.startsWith("/app/com-nousresearch-hermes")) {
-        return true;
-      }
-    } catch {
-      // malformed header, treat as unsafe
-      return false;
-    }
-  }
-
-  // 无明确安全来源时，保守拒绝写操作
-  return false;
-}
-
 async function handleRequest(req) {
   const url = new URL(req.url);
   let pathname = stripGatewayPrefix(url.pathname);
@@ -141,7 +105,7 @@ async function handleRequest(req) {
 
   if (pathname.startsWith("/api/")) {
     if (!isSafeWriteRequest(req)) {
-      return new Response("Forbidden: untrusted origin", { status: 403 });
+      return errorResponse("Forbidden: untrusted origin", "FORBIDDEN_ORIGIN", 403);
     }
 
     if (pathname === "/api/health" && method === "GET") {
@@ -163,7 +127,7 @@ async function handleRequest(req) {
         ttydPid: getTtydPid(),
         ttydUptime: getTtydUptime(),
         ttydPort: getTtydPort(),
-        dashboardInsecure: process.env.HERMES_DASHBOARD_INSECURE === "1",
+        dashboardInsecure: process.env.HERMES_DASHBOARD_INSECURE !== "0",
         version: await getVersion()
       });
     }
@@ -232,7 +196,7 @@ async function handleRequest(req) {
       return json(result, result.ok ? 200 : 500);
     }
     if (pathname === "/api/dashboard/status" && method === "GET") {
-      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT });
+      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT, insecure: process.env.HERMES_DASHBOARD_INSECURE !== "0" });
     }
     if (pathname === "/api/dashboard/start" && method === "POST") {
       const result = await startDashboard();
@@ -351,7 +315,7 @@ const server = Bun.serve({
       if (pathname === "/ttyd" || pathname.startsWith("/ttyd/")) {
         // 安全：终端路径必须来自受信任来源（同域或 fnOS 网关）
         if (!isSafeWriteRequest(req)) {
-          return new Response("Forbidden: untrusted origin", { status: 403 });
+          return errorResponse("Forbidden: untrusted origin", "FORBIDDEN_ORIGIN", 403);
         }
         if (req.headers.get("upgrade")?.toLowerCase() === "websocket") {
           const suffix = pathname.replace(/^\/ttyd/, "") || "/";

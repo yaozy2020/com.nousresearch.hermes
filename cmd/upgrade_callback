@@ -1,2 +1,71 @@
 #!/bin/bash
+
+### upgrade_callback — 安全升级辅助
+### 备份配置、清理旧 PID/socket/runtime，始终 exit 0，不让 fnOS 标记应用损坏
+
+export PATH=/var/apps/bunjs/target/bin:/var/apps/nodejs_v24/target/bin:$PATH
+
+HERMES_DATA_DIR="${TRIM_PKGHOME}/data"
+HOME_DIR="${HERMES_DATA_DIR}/home"
+CONFIG_DIR="${HERMES_DATA_DIR}/config"
+RUNTIME_DIR="${HERMES_DATA_DIR}/runtime"
+LOG_DIR="${HERMES_DATA_DIR}/logs"
+APP_DIR="${TRIM_APPDEST}"
+
+LOG_FILE="${LOG_DIR}/upgrade.log"
+
+log() {
+  local msg="$(date '+%F %T') $*"
+  echo "${msg}"
+  if [ -n "${TRIM_TEMP_LOGFILE}" ]; then
+    echo "${msg}" >> "${TRIM_TEMP_LOGFILE}" 2>/dev/null || true
+  fi
+  if [ -d "${LOG_DIR}" ]; then
+    echo "${msg}" >> "${LOG_FILE}" 2>/dev/null || true
+  fi
+}
+
+log "=== upgrade_callback start ==="
+log "TRIM_PKGHOME=${TRIM_PKGHOME:-<unset>}"
+log "TRIM_APPDEST=${TRIM_APPDEST:-<unset>}"
+
+# 0) 确保日志目录存在且权限安全
+mkdir -p "${LOG_DIR}" 2>/dev/null
+chmod 750 "${LOG_DIR}" 2>/dev/null || true
+
+# 1) 备份配置（保留最近 5 份）
+BACKUP_DIR="${HERMES_DATA_DIR}/backups"
+mkdir -p "${BACKUP_DIR}" 2>/dev/null
+chmod 750 "${BACKUP_DIR}" 2>/dev/null || true
+
+TS=$(date '+%Y%m%d-%H%M%S')
+for SRC in "${HOME_DIR}/config.yaml" "${HOME_DIR}/.env" "${CONFIG_DIR}/config.yaml" "${CONFIG_DIR}/.env"; do
+  if [ -f "${SRC}" ]; then
+    DST="${BACKUP_DIR}/$(basename "${SRC}").${TS}"
+    cp -f "${SRC}" "${DST}" 2>/dev/null && chmod 640 "${DST}" 2>/dev/null
+    log "config backed up: ${SRC} -> ${DST}"
+  fi
+done
+
+# 保留最近 5 份备份
+for f in config.yaml .env; do
+  ls -1t "${BACKUP_DIR}/${f}".* 2>/dev/null | tail -n +6 | while read -r old; do
+    rm -f "${old}" 2>/dev/null && log "removed old backup: ${old}"
+  done
+done
+
+# 2) 清理旧 PID / socket / runtime（避免升级后旧进程被误识别）
+rm -f "${RUNTIME_DIR}"/*.pid 2>/dev/null || true
+rm -f "${APP_DIR}"/*.sock 2>/dev/null || true
+rm -f "${RUNTIME_DIR}"/ttyd-info.json 2>/dev/null || true
+log "runtime cleaned"
+
+# 3) 若存在旧版独立 gateway.log / dashboard.log，提示迁移
+for old_log in "${LOG_DIR}/gateway.log" "${LOG_DIR}/dashboard.log"; do
+  if [ -f "${old_log}" ]; then
+    mv -f "${old_log}" "${old_log}.old" 2>/dev/null && log "moved legacy log: ${old_log} -> ${old_log}.old"
+  fi
+done
+
+log "=== upgrade_callback completed ==="
 exit 0

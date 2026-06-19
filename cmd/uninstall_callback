@@ -4,14 +4,21 @@
 ### wizard_delete_data: "true" → 删除全部数据；"false" / 其他 → 保留
 ### 不论选哪种，瞬态 socket / pid / 临时目录都会被清掉
 
-LOG_FILE="${TRIM_PKGVAR:-/tmp}/uninstall.log"
-log() { echo "$(date '+%F %T') $*" >> "$LOG_FILE"; }
+DATA_DIR="${TRIM_PKGHOME}/data"
+APP_DIR="${TRIM_APPDEST}"
+
+# 优先写入 DATA_DIR/logs；若 DATA_DIR 不存在或不可写，回退到 stderr
+LOG_FILE="${DATA_DIR}/logs/uninstall.log"
+log() {
+  local msg="$(date '+%F %T') $*"
+  echo "${msg}"
+  if [ -d "${DATA_DIR}/logs" ]; then
+    echo "${msg}" >> "${LOG_FILE}" 2>/dev/null || true
+  fi
+}
 
 log "=== uninstall_callback start ==="
 log "wizard_delete_data=${wizard_delete_data:-<unset>}"
-
-DATA_DIR="${TRIM_PKGHOME}/data"
-APP_DIR="${TRIM_APPDEST}"
 
 # 安全：DATA_DIR 必须位于受控路径下，防止配置错误导致误删系统目录
 is_safe_data_dir() {
