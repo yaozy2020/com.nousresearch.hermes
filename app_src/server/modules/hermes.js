@@ -36,8 +36,59 @@ let dashboardProcess = null;
 let installInProgress = false;
 const processStartTimes = new Map();
 
+const DEFAULT_PACKAGE_SPEC = "hermes-agent";
+const OFFICIAL_GIT_SPEC = "git+https://github.com/NousResearch/hermes.git";
+const ALLOWED_PACKAGE_SPECS = new Set([DEFAULT_PACKAGE_SPEC, OFFICIAL_GIT_SPEC]);
+
 export function isInstallInProgress() {
   return installInProgress;
+}
+
+// 校验 pip 包规格：默认只允许官方 PyPI 包或官方 Git 源。
+// 当 HERMES_ALLOW_CUSTOM_PACKAGE=1 时，允许用户传入自定义 PyPI/ Git 源规格，
+// 但仍禁止 shell 元字符、file://、-- 选项等危险内容。
+export function validatePackageSpec(packageSpec) {
+  if (!packageSpec || typeof packageSpec !== "string") {
+    return { ok: false, error: "packageSpec is required" };
+  }
+  if (packageSpec.length > 200) {
+    return { ok: false, error: "packageSpec too long" };
+  }
+
+  // 内置白名单
+  if (ALLOWED_PACKAGE_SPECS.has(packageSpec.trim())) {
+    return { ok: true };
+  }
+
+  // 未开启自定义源开关时，直接拒绝
+  if (process.env.HERMES_ALLOW_CUSTOM_PACKAGE !== "1") {
+    return { ok: false, error: "Custom package source is not allowed. Use hermes-agent or enable HERMES_ALLOW_CUSTOM_PACKAGE=1." };
+  }
+
+  const spec = packageSpec.trim();
+
+  // 禁止明显的危险字符与模式（保留 < > 用于版本约束，如 >=、<=、<、>）
+  if (/[;|&$(){}\`'"\s]/.test(spec)) {
+    return { ok: false, error: "packageSpec contains disallowed characters" };
+  }
+  if (spec.startsWith("-") || spec.includes("--")) {
+    return { ok: false, error: "packageSpec must not contain pip option flags" };
+  }
+  if (/^(file|http|https|ftp|s3):/i.test(spec)) {
+    return { ok: false, error: "packageSpec must not contain arbitrary URLs" };
+  }
+
+  // 允许两种形式：
+  // 1) PyPI 风格：name[extras](==|>=|...)version，允许 , 组合多个约束
+  // 2) git+https:// 官方 Git 源
+  const pypiRe = /^[A-Za-z0-9][A-Za-z0-9._-]*(?:\[[A-Za-z0-9_,.-]+\])?(?:\s*(?:==|>=|<=|~=|!=|>|<)\s*[A-Za-z0-9._*+!-]+(?:\s*,\s*(?:==|>=|<=|~=|!=|>|<)\s*[A-Za-z0-9._*+!-]+)*)?$/;
+  const gitRe = /^git\+https:\/\/[A-Za-z0-9._/-]+\/[A-Za-z0-9._/-]+(?:\.git)?(?:@[A-Za-z0-9._-]+)?$/;
+
+  if (pypiRe.test(spec) || gitRe.test(spec)) {
+    return { ok: true };
+  }
+
+  return { ok: false, error: "packageSpec format not allowed" };
 }
 
 function getProcessUptime(pid) {
@@ -277,6 +328,13 @@ function getPipIndexArgs() {
 export async function installHermes(packageSpec) {
   if (installInProgress) return { ok: false, error: "Installation already in progress" };
   if (existsSync(HERMES_BIN)) return { ok: true, message: "already installed", bin: HERMES_BIN };
+
+  const resolvedSpec = packageSpec || DEFAULT_PACKAGE_SPEC;
+  const validation = validatePackageSpec(resolvedSpec);
+  if (!validation.ok) {
+    return { ok: false, error: validation.error };
+  }
+
   installInProgress = true;
   broadcastLog("[install] Starting Hermes installation ...\n");
   try {
@@ -303,8 +361,8 @@ export async function installHermes(packageSpec) {
     broadcastLog("[install] Upgrading pip ...\n");
     const upgradeProc = Bun.spawn([pip, "install", "--upgrade", "pip", "wheel", "setuptools", "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
     await upgradeProc.exited;
-    broadcastLog(`[install] Installing ${packageSpec} ...\n`);
-    const installProc = Bun.spawn([pip, "install", packageSpec, "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
+    broadcastLog(`[install] Installing ${resolvedSpec} ...\n`);
+    const installProc = Bun.spawn([pip, "install", resolvedSpec, "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
     (async () => {
       const reader = installProc.stderr.getReader();
       try {
@@ -320,7 +378,7 @@ export async function installHermes(packageSpec) {
     const exitCode = await installProc.exited;
     if (exitCode !== 0) {
       broadcastLog(`[install] pip install failed (exit ${exitCode}), trying GitHub source ...\n`);
-      const ghProc = Bun.spawn([pip, "install", "git+https://github.com/NousResearch/hermes.git", "-q"], { stdout: "pipe", stderr: "pipe" });
+      const ghProc = Bun.spawn([pip, "install", OFFICIAL_GIT_SPEC, "-q"], { stdout: "pipe", stderr: "pipe" });
       const ghExit = await ghProc.exited;
       if (ghExit !== 0) { installInProgress = false; return { ok: false, error: `pip install failed (exit ${exitCode}, github ${ghExit})` }; }
     }

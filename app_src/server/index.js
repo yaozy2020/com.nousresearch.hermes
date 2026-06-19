@@ -7,11 +7,11 @@ import { json, parseBody } from "./modules/utils.js";
 import { serveStatic } from "./modules/static.js";
 import { getVersion } from "./modules/version.js";
 import { errorResponse } from "./modules/error.js";
-import { isSafeWriteRequest } from "./modules/security.js";
+import { isSafeWriteRequest, isSafeReadRequest } from "./modules/security.js";
 import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
-  installHermes, restartHermesAll, isInstallInProgress
+  installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec
 } from "./modules/hermes.js";
 import { isTtydAlive, getTtydPid, getTtydPort, getTtydUptime, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
@@ -52,6 +52,12 @@ async function proxyTerminalHttp(req, pathname) {
   if (!isTtydAlive()) {
     return new Response("Terminal not started. POST /api/terminal/start first.", { status: 503 });
   }
+
+  // 防止恶意网页通过 iframe 嵌入终端做点击劫持
+  if (req.method === "GET" && !isSafeReadRequest(req)) {
+    return new Response("Forbidden: untrusted origin", { status: 403 });
+  }
+
   const url = new URL(req.url);
   const suffix = pathname.replace(/^\/ttyd/, "") || "/";
   const targetUrl = getTtydTargetUrl(suffix + (url.search || ""));
@@ -74,6 +80,9 @@ async function proxyTerminalHttp(req, pathname) {
     const resHeaders = new Headers(res.headers);
     resHeaders.delete("content-encoding");
     resHeaders.set("content-length", String(body.byteLength));
+    // 防止终端被嵌入第三方页面
+    resHeaders.set("X-Frame-Options", "DENY");
+    resHeaders.set("Content-Security-Policy", "frame-ancestors 'self'");
     // 重写 location，避免客户端跳到 127.0.0.1:<ttyd-port>
     const location = resHeaders.get("location");
     if (location) {
@@ -192,6 +201,10 @@ async function handleRequest(req) {
     if (pathname === "/api/hermes/install" && method === "POST") {
       const body = await parseBody(req);
       const packageSpec = body.package || "hermes-agent";
+      const validation = validatePackageSpec(packageSpec);
+      if (!validation.ok) {
+        return errorResponse(validation.error, 400, "invalid_package_spec");
+      }
       const result = await installHermes(packageSpec);
       return json(result, result.ok ? 200 : 500);
     }

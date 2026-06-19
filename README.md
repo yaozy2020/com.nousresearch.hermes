@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.25.4-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.4)
+[![Version](https://img.shields.io/badge/version-0.25.7-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.25.7)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,17 @@ bash build.sh
 
 ## 版本历史
 
-### v0.25.4（当前版本）
+### v0.25.7（当前版本）
+
+治理与安全加固：
+
+- **CSRF 校验收紧**：删除“只要是私有 IP 就放行”的兜底逻辑，`Origin: null` 写操作直接拒绝；写接口仅允许与 `Host` 头部匹配的来源（含 `HERMES_TRUSTED_HOSTS` 配置）
+- **Hermes 安装包来源限制**：默认只允许 `hermes-agent` 与官方 Git 源；自定义源需显式设置 `HERMES_ALLOW_CUSTOM_PACKAGE=1`，且仍禁止 shell 元字符、`file://`、pip 选项等危险输入
+- **终端 framing 保护**：`/ttyd*` 响应增加 `X-Frame-Options: DENY` 与 `CSP: frame-ancestors 'self'`，并对 GET 请求校验来源，防止点击劫持
+- **卸载向导升级**：参考 QwenPaw 提供“保留配置文件 / 保留运行环境 / 确认卸载”三个独立开关，避免误删 venv 或配置
+- **文档同步**：README badge 与版本历史更新到 v0.25.7
+
+### v0.25.4
 
 - **状态总览 Terminal 卡片增加停止按钮**：可直接在首页停止 ttyd 终端进程
 - **配置页增加 Dashboard 不安全模式步骤提示**：在 `.env` 编辑框下方直接展示开启外部访问的 4 步操作
@@ -270,24 +280,25 @@ Hermes 安装在独立用户目录下的虚拟环境中：`/vol2/@apphome/com.no
 
 ### 卸载会留下数据吗？
 
-v0.20.1 起卸载向导完整支持「保留 / 清除」两种模式：
-- **保留现有文件**：仅停服务并清理 socket/pid，data 目录原样保留
-- **清除所有应用数据**：彻底删除 venv、.hermes、config、logs、workspace、runtime、state 等子目录
+v0.25.7 起卸载向导支持三个独立开关：
+- **保留配置文件**：保留 `config/`、`home/` 与根目录 `.env`
+- **保留运行环境**：保留 `venv/`、`install/`、`workspace/`、`runtime/`、`state/`、`logs/` 与 `.hermes_*`
+- **确认卸载**：必须开启后才会执行删除
 
-### 如何开启 Dashboard 外部访问？
+旧版「保留 / 清除」两种模式仍兼容。
 
-v0.25.2 起 Dashboard 默认仅监听 `127.0.0.1`（安全模式），不会直接暴露在局域网中。如果你确实需要浏览器直接访问 `http://nas:9119`：
+### Dashboard 默认是安全模式吗？
+
+v0.25.7 起，为适配 NAS 局域网使用场景，Dashboard **默认**绑定 `0.0.0.0:9119`（`HERMES_DASHBOARD_INSECURE=1`），安装后可直接在局域网浏览器访问 `http://nas:9119`。
+
+如果你希望回到仅本机访问的安全模式：
 
 1. 打开 Hermes 面板 → **配置**
-2. 在 `.env` 编辑框末尾添加：
-   ```bash
-   HERMES_DASHBOARD_INSECURE=1
-   ```
+2. 将 `.env` 中的 `HERMES_DASHBOARD_INSECURE=1` 改为 `HERMES_DASHBOARD_INSECURE=0`
 3. 点「保存」
-4. 到 **fnOS 应用中心**停止并重新启动 Hermes 应用（面板后端启动时才读取 `.env`）
-5. 回到面板，Dashboard 状态卡片会显示「外部访问模式」，此时「打开」按钮可直接跳转 `http://nas:9119`
+4. 到 **fnOS 应用中心**停止并重新启动 Hermes 应用
 
-> ⚠️ 注意：开启后 Dashboard 将绑定 `0.0.0.0:9119` 且无认证，建议仅在受信任的家庭内网使用；公网映射或多人共用网络请勿启用。
+> ⚠️ 注意：默认模式下 Dashboard 绑定 `0.0.0.0:9119` 且无认证，建议仅在受信任的家庭内网使用；公网映射或多人共用网络请锁回 `HERMES_DASHBOARD_INSECURE=0`。
 
 ### 亮暗模式不跟随飞牛系统？
 
