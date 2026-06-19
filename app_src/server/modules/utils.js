@@ -18,7 +18,7 @@ export async function parseBody(req) {
     try {
       return JSON.parse(text);
     } catch {
-      return {};
+      throw new Error("Invalid JSON body");
     }
   }
   if (ct.includes("application/x-www-form-urlencoded")) {

@@ -37,7 +37,14 @@ if [ -f "${HERMES_HOME}/.env" ]; then
     set +a
 fi
 
-CMD="env HERMES_DATA_DIR=\"${HERMES_DATA_DIR}\" STATIC_DIR=\"${STATIC_DIR}\" SOCKET_PATH=\"${SOCKET_PATH}\" HERMES_VENV=\"${HERMES_VENV}\" HERMES_BIN=\"${HERMES_BIN}\" HERMES_PANEL_BIN=\"${HERMES_PANEL_BIN}\" HERMES_DASHBOARD_PORT=\"${HERMES_DASHBOARD_PORT:-9119}\" bun \"${SERVER_SCRIPT}\""
+# 导出给 server/index.js 的环境变量
+export HERMES_DATA_DIR="${HERMES_DATA_DIR}"
+export STATIC_DIR="${STATIC_DIR}"
+export SOCKET_PATH="${SOCKET_PATH}"
+export HERMES_VENV="${HERMES_VENV}"
+export HERMES_BIN="${HERMES_BIN}"
+export HERMES_PANEL_BIN="${HERMES_PANEL_BIN}"
+export HERMES_DASHBOARD_PORT="${HERMES_DASHBOARD_PORT:-9119}"
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ${LOG_FILE}
@@ -55,7 +62,8 @@ start_process() {
 
     log_msg "Starting Hermes control panel ..."
     rm -f "${SOCKET_PATH}"
-    bash -c "${CMD}" >> ${LOG_FILE} 2>&1 &
+    # 直接启动 bun，记录的就是 bun 进程 PID，避免 bash 子进程残留
+    bun "${SERVER_SCRIPT}" >> ${LOG_FILE} 2>&1 &
     printf "%s" "$!" > ${PID_FILE}
     log_msg "Started, pid=$!"
     return 0

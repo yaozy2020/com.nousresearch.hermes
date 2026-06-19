@@ -1,9 +1,17 @@
 // @bun
 // app_src/server/index.js — Hermes 面板入口（模块化后）
 import { existsSync, chmodSync, readFileSync } from "fs";
-import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel } from "./modules/config.js";
+import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig } from "./modules/config.js";
 import { wsClients, readLogs, log } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
+
+async function safeParseBody(req) {
+  try {
+    return await parseBody(req);
+  } catch (err) {
+    return errorResponse(err.message, 400, "invalid_body");
+  }
+}
 import { serveStatic } from "./modules/static.js";
 import { getVersion } from "./modules/version.js";
 import { errorResponse } from "./modules/error.js";
@@ -166,7 +174,8 @@ async function handleRequest(req) {
       return json(readConfig());
     }
     if (pathname === "/api/config" && method === "POST") {
-      const body = await parseBody(req);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
       const result = writeConfig(body.yaml, body.env);
       return json(result);
     }
@@ -182,7 +191,8 @@ async function handleRequest(req) {
       if (m) {
         const chanName = m[1];
         if (method === "POST" || method === "PUT") {
-          const body = await parseBody(req);
+          const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
           const result = writeChannel(chanName, body || {});
           return json(result, result.ok ? 200 : 400);
         }
@@ -199,7 +209,8 @@ async function handleRequest(req) {
       return json({ installed: existsSync(HERMES_BIN), installing: isInstallInProgress(), venv: VENV_DIR, bin: HERMES_BIN });
     }
     if (pathname === "/api/hermes/install" && method === "POST") {
-      const body = await parseBody(req);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
       const packageSpec = body.package || "hermes-agent";
       const validation = validatePackageSpec(packageSpec);
       if (!validation.ok) {
@@ -225,6 +236,10 @@ async function handleRequest(req) {
       const result = await startDashboard();
       return json(result, result.ok ? 200 : 500);
     }
+    if (pathname === "/api/dashboard/lock" && method === "POST") {
+      const result = lockDashboardConfig();
+      return json(result, result.ok ? 200 : 500);
+    }
     if (pathname === "/api/hermes/restart" && method === "POST") {
       const result = await restartHermesAll();
       return json(result);
@@ -246,7 +261,8 @@ async function handleRequest(req) {
       });
     }
     if (pathname === "/api/terminal/send" && method === "POST") {
-      const body = await parseBody(req);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
       const seq = (body && body.input) || (body && body.cmd) || (body && body.data) || "";
       if (!activeTerminalBackend || activeTerminalBackend.readyState !== WebSocket.OPEN) {
         return json({ ok: false, error: "终端未连接" }, 400);
@@ -263,7 +279,8 @@ async function handleRequest(req) {
       }
     }
     if (pathname === "/api/terminal/signal" && method === "POST") {
-      const body = await parseBody(req);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
       const sig = (body && body.signal) || "SIGINT";
       const pid = getTtydPid();
       if (!pid) return json({ ok: false, error: "终端未运行" }, 400);
@@ -282,7 +299,8 @@ async function handleRequest(req) {
       return json({ ok });
     }
     if (pathname === "/api/terminal/start" && method === "POST") {
-      const body = await parseBody(req);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
       const cmd = (body && body.cmd) || "setup";
       const mobile = !!(body && body.mobile);
       const result = await startTtyd(cmd, { mobile });

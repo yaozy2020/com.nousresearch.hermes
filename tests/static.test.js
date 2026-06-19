@@ -1,6 +1,6 @@
 import { describe, it, before, after } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, rmSync } from "fs";
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { serveStatic } from "../app_src/server/modules/static.js";
@@ -48,5 +48,11 @@ describe("serveStatic", () => {
     assert.equal(res.status, 200);
     assert.equal(res.headers.get("Content-Type"), "text/html");
     assert.equal(await res.text(), "<html></html>");
+  });
+
+  it("returns 404 for directory paths", () => {
+    mkdirSync(join(tmpDir, "subdir"));
+    const res = serveStatic("/subdir", tmpDir);
+    assert.equal(res.status, 404);
   });
 });

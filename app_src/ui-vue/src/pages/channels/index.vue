@@ -80,13 +80,30 @@ const channelsDef: ChannelDef[] = [
 ]
 
 const channelValues = ref<Record<string, ChannelData>>({})
+const channelForm = ref<Record<string, Record<string, string>>>({})
+const fieldErrors = ref<Record<string, string[]>>({})
 const loading = ref(false)
+
+function initForm() {
+  const form: Record<string, Record<string, string>> = {}
+  for (const c of channelsDef) {
+    form[c.id] = {}
+    const cur = channelValues.value[c.id] || {}
+    for (const f of c.fields) {
+      const v = cur[f.key]
+      form[c.id][f.key] = typeof v === 'string' ? v : ''
+    }
+  }
+  channelForm.value = form
+  fieldErrors.value = {}
+}
 
 async function loadChannels() {
   loading.value = true
   try {
     const r = await api<{ channels?: Record<string, ChannelData> }>('api/channels')
     channelValues.value = r.channels || {}
+    initForm()
   } catch (e: unknown) {
     const err = e as Error
     notify('加载频道失败: ' + (err?.message ?? String(e)), 'error')
@@ -95,21 +112,37 @@ async function loadChannels() {
   }
 }
 
+function hasError(id: string, key: string): boolean {
+  return fieldErrors.value[id]?.includes(key) ?? false
+}
+
+function clearError(id: string, key: string) {
+  const list = fieldErrors.value[id]
+  if (!list) return
+  const idx = list.indexOf(key)
+  if (idx >= 0) list.splice(idx, 1)
+}
+
 async function saveChannel(id: string) {
   const def = channelsDef.find(c => c.id === id)
   if (!def) return
 
   const values: Record<string, string> = {}
+  const errors: string[] = []
   for (const f of def.fields) {
-    const input = document.getElementById(`ch_${id}_${f.key}`) as HTMLInputElement | null
-    const v = input?.value.trim() || ''
+    const v = channelForm.value[id]?.[f.key]?.trim() || ''
     if (f.required && !v) {
-      notify(`${f.label} 为必填项`, 'warning')
-      input?.focus()
-      return
+      errors.push(f.key)
     }
     if (v) values[f.key] = v
   }
+
+  if (errors.length) {
+    fieldErrors.value[id] = errors
+    notify('请填写必填项后再保存', 'warning')
+    return
+  }
+  fieldErrors.value[id] = []
 
   try {
     const r = await api<{ ok: boolean; error?: string }>(`api/channels/${id}`, {
@@ -145,12 +178,6 @@ async function deleteChannel(id: string) {
   }
 }
 
-function fieldValue(chanId: string, key: string): string {
-  const cur = channelValues.value[chanId] || {}
-  const v = cur[key]
-  return typeof v === 'string' ? v : ''
-}
-
 function isConfigured(chanId: string): boolean {
   return !!channelValues.value[chanId]?._configured
 }
@@ -180,59 +207,38 @@ onMounted(loadChannels)
       >
         <template #header>
           <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-              <UIcon name="i-lucide-message-square" class="w-5 h-5 text-primary" />
-              <span class="font-semibold text-[var(--ui-text)]">{{ c.name }}</span>
-              <span class="text-sm text-[var(--ui-text-muted)]">{{ c.desc }}</span>
+            <div>
+              <h2 class="text-lg font-semibold text-[var(--ui-text)]">{{ c.name }}</h2>
+              <p class="text-sm text-[var(--ui-text-muted)]">{{ c.desc }}</p>
             </div>
-            <UBadge :color="isConfigured(c.id) ? 'success' : 'neutral'" variant="soft" size="sm">
-              {{ isConfigured(c.id) ? '已配置' : '未配置' }}
-            </UBadge>
+            <UBadge v-if="isConfigured(c.id)" color="success" variant="soft">已配置</UBadge>
           </div>
         </template>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <UFormField v-for="f in c.fields" :key="f.key" :label="f.label">
-            <UInput
-              :id="`ch_${c.id}_${f.key}`"
-              :type="f.secret ? 'password' : 'text'"
-              :placeholder="f.placeholder"
-              :model-value="fieldValue(c.id, f.key)"
-              class="w-full"
-            />
-          </UFormField>
-        </div>
-        <div class="flex gap-2 mt-4">
-          <UButton color="primary" size="sm" :loading="loading" @click="saveChannel(c.id)">保存</UButton>
-          <UButton v-if="isConfigured(c.id)" color="neutral" variant="ghost" size="sm" @click="deleteChannel(c.id)">清空</UButton>
+
+        <div class="space-y-4">
+          <div v-for="f in c.fields" :key="f.key">
+            <UFormField :label="f.label">
+              <UInput
+                v-model="channelForm[c.id][f.key]"
+                class="w-full"
+                :type="f.secret ? 'password' : 'text'"
+                :placeholder="f.placeholder || ''"
+                :color="hasError(c.id, f.key) ? 'error' : undefined"
+                @input="clearError(c.id, f.key)"
+              />
+            </UFormField>
+          </div>
+
+          <div class="flex items-center gap-2 pt-2">
+            <UButton color="primary" icon="i-lucide-save" :loading="loading" @click="saveChannel(c.id)">
+              保存
+            </UButton>
+            <UButton color="neutral" variant="ghost" icon="i-lucide-trash-2" @click="deleteChannel(c.id)">
+              清空
+            </UButton>
+          </div>
         </div>
       </UCard>
     </div>
-
-    <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
-      <template #header>
-        <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-alert-circle" class="w-5 h-5 text-warning" />
-          <span class="font-semibold text-[var(--ui-text)]">进阶频道（需配置文件 + 引导）</span>
-        </div>
-      </template>
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="p-3 bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg">
-          <div class="font-medium text-[var(--ui-text)]">DingTalk 钉钉</div>
-          <div class="text-xs text-[var(--ui-text-muted)] mt-1">需在钉钉开放平台注册应用，配置 OAuth 回调 URL。</div>
-        </div>
-        <div class="p-3 bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg">
-          <div class="font-medium text-[var(--ui-text)]">Feishu 飞书</div>
-          <div class="text-xs text-[var(--ui-text-muted)] mt-1">需企业自建应用 + 事件订阅回调。</div>
-        </div>
-        <div class="p-3 bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg">
-          <div class="font-medium text-[var(--ui-text)]">Email 邮件</div>
-          <div class="text-xs text-[var(--ui-text-muted)] mt-1">SMTP/IMAP 多字段配置。</div>
-        </div>
-        <div class="p-3 bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg">
-          <div class="font-medium text-[var(--ui-text)]">Webhook</div>
-          <div class="text-xs text-[var(--ui-text-muted)] mt-1">需在 config.yaml 定义路由及 HMAC 密钥。</div>
-        </div>
-      </div>
-    </UCard>
   </div>
 </template>
