@@ -256,6 +256,17 @@ v0.22.0 起控制面板读取飞牛桌面写入的 `DesktopConfig-1000` localSto
 | 飞牛 NAS 官网 | [fnnas.com](https://www.fnnas.com/) |
 | fnOS 开发文档 | [fnnas/fnnas-docs](https://github.com/fnnas/fnnas-docs) |
 
+### 前端技术栈
+
+| 项目 | 地址 |
+|------|------|
+| Vue 3 | [vuejs.org](https://vuejs.org/) |
+| Nuxt UI v4 | [ui.nuxt.com](https://ui.nuxt.com/) |
+| Tailwind CSS | [tailwindcss.com](https://tailwindcss.com/) |
+| Vite | [vitejs.dev](https://vitejs.dev/) |
+| Vue Router | [router.vuejs.org](https://router.vuejs.org/) |
+| Lucide Icons | [lucide.dev](https://lucide.dev/) |
+
 ## 许可证
 
 本项目基于 [MIT](LICENSE) 许可证开源。
