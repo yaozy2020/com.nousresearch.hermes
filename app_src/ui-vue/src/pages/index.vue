@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { api } from '@/composables/useApi'
+import StatusCard from '@/components/StatusCard.vue'
 import type { HealthResponse, LogResponse } from '@/types/api'
 
 interface HermesStatus {
@@ -200,117 +201,83 @@ onUnmounted(() => {
     </div>
 
     <!-- 状态卡片 -->
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-layers" class="w-5 h-5 text-primary" />
-            <span class="font-semibold text-[var(--ui-text)]">Hermes 安装</span>
-          </div>
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch">
+      <StatusCard
+        icon="i-lucide-layers"
+        title="Hermes 安装"
+        :status-color="hermes ? (hermes.installed ? 'success' : hermes.installing ? 'warning' : 'neutral') : 'neutral'"
+        :status-icon="hermes ? (hermes.installed ? 'i-lucide-check-circle' : hermes.installing ? 'i-lucide-loader-2' : 'i-lucide-power-off') : 'i-lucide-loader-2'"
+        :status-text="hermes ? (hermes.installed ? '已安装' : hermes.installing ? '安装中…' : '未安装') : '检查中…'"
+        :status-animated="hermes?.installing"
+      >
+        <template v-if="hermes?.installed && hermes.bin" #footer>
+          路径：<span class="font-mono text-[var(--ui-text)]">{{ hermes.bin }}</span>
         </template>
-        <div class="space-y-3">
-          <div v-if="hermes" class="flex items-center gap-3">
-            <UBadge :color="hermes.installed ? 'success' : hermes.installing ? 'warning' : 'neutral'" variant="soft" size="md">
-              <template #leading>
-                <UIcon :name="hermes.installed ? 'i-lucide-check-circle' : hermes.installing ? 'i-lucide-loader-2' : 'i-lucide-stop-circle'" class="w-4 h-4" />
-              </template>
-              {{ hermes.installed ? '已安装' : hermes.installing ? '安装中…' : '未安装' }}
-            </UBadge>
-            <UButton v-if="!hermes.installed && !hermes.installing" color="primary" size="sm" @click="installHermes">
-              一键安装
-            </UButton>
-          </div>
-          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
-          <div v-if="hermes?.installed && hermes.bin" class="text-xs text-[var(--ui-text-muted)]">
-            路径：<span class="font-mono text-[var(--ui-text)]">{{ hermes.bin }}</span>
-          </div>
-        </div>
-      </UCard>
+        <template #actions>
+          <UButton v-if="!hermes?.installed && !hermes?.installing" color="primary" size="sm" @click="installHermes">一键安装</UButton>
+        </template>
+      </StatusCard>
 
-      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-zap" class="w-5 h-5 text-primary" />
-            <span class="font-semibold text-[var(--ui-text)]">Gateway</span>
-          </div>
+      <StatusCard
+        icon="i-lucide-zap"
+        title="Gateway"
+        :status-color="gateway ? (gateway.running ? 'success' : 'neutral') : 'neutral'"
+        :status-icon="gateway?.running ? 'i-lucide-activity' : 'i-lucide-power-off'"
+        :status-text="gateway ? (gateway.running ? '运行中' : '未运行') : '检查中…'"
+        :status-animated="gateway?.running"
+      >
+        <template v-if="gateway?.running" #status-extra>
+          <span class="text-xs text-[var(--ui-text-muted)]">
+            PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
+            <span v-if="gateway.uptime" class="ml-2">已运行 {{ gateway.uptime }}</span>
+          </span>
         </template>
-        <div class="space-y-3">
-          <div v-if="gateway" class="flex items-center gap-3">
-            <UBadge :color="gateway.running ? 'success' : 'neutral'" variant="soft" size="md">
-              <template #leading>
-                <UIcon :name="gateway.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="gateway.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
-              </template>
-              {{ gateway.running ? '运行中' : '未运行' }}
-            </UBadge>
-            <span v-if="gateway.running" class="text-xs text-[var(--ui-text-muted)]">
-              PID <span class="font-mono text-[var(--ui-text)]">{{ gateway.pid || '-' }}</span>
-              <span v-if="gateway.uptime" class="ml-2">已运行 {{ gateway.uptime }}</span>
-            </span>
-          </div>
-          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
-          <div class="flex flex-wrap gap-2">
-            <UButton color="primary" size="sm" :disabled="gateway?.running" @click="gatewayAction('start')">启动</UButton>
-            <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('stop')">停止</UButton>
-            <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('restart')">重启</UButton>
-          </div>
-        </div>
-      </UCard>
+        <template #actions>
+          <UButton color="primary" size="sm" :disabled="gateway?.running" @click="gatewayAction('start')">启动</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('stop')">停止</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!gateway?.running" @click="gatewayAction('restart')">重启</UButton>
+        </template>
+      </StatusCard>
 
-      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-layout-template" class="w-5 h-5 text-primary" />
-            <span class="font-semibold text-[var(--ui-text)]">Dashboard</span>
-          </div>
+      <StatusCard
+        icon="i-lucide-layout-template"
+        title="Dashboard"
+        :status-color="dashboard ? (dashboard.running ? 'success' : 'neutral') : 'neutral'"
+        :status-icon="dashboard?.running ? 'i-lucide-activity' : 'i-lucide-power-off'"
+        :status-text="dashboard ? (dashboard.running ? '运行中' : '未运行') : '检查中…'"
+        :status-animated="dashboard?.running"
+      >
+        <template v-if="dashboard?.running" #status-extra>
+          <span class="text-xs text-[var(--ui-text-muted)]">
+            PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
+            <span v-if="dashboard.uptime" class="ml-2">已运行 {{ dashboard.uptime }}</span>
+          </span>
         </template>
-        <div class="space-y-3">
-          <div v-if="dashboard" class="flex items-center gap-3">
-            <UBadge :color="dashboard.running ? 'success' : 'neutral'" variant="soft" size="md">
-              <template #leading>
-                <UIcon :name="dashboard.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="dashboard.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
-              </template>
-              {{ dashboard.running ? '运行中' : '未运行' }}
-            </UBadge>
-            <span v-if="dashboard.running" class="text-xs text-[var(--ui-text-muted)]">
-              PID <span class="font-mono text-[var(--ui-text)]">{{ dashboard.pid || '-' }}</span>
-              <span v-if="dashboard.uptime" class="ml-2">已运行 {{ dashboard.uptime }}</span>
-            </span>
-          </div>
-          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
-          <div class="flex flex-wrap gap-2">
-            <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
-            <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
-            <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
-          </div>
-        </div>
-      </UCard>
+        <template #actions>
+          <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="openDashboard">打开</UButton>
+        </template>
+      </StatusCard>
 
-      <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
-        <template #header>
-          <div class="flex items-center gap-2">
-            <UIcon name="i-lucide-terminal" class="w-5 h-5 text-primary" />
-            <span class="font-semibold text-[var(--ui-text)]">Terminal</span>
-          </div>
+      <StatusCard
+        icon="i-lucide-terminal"
+        title="Terminal"
+        :status-color="terminal ? (terminal.running ? 'success' : 'neutral') : 'neutral'"
+        :status-icon="terminal?.running ? 'i-lucide-activity' : 'i-lucide-power-off'"
+        :status-text="terminal ? (terminal.running ? '运行中' : '未运行') : '检查中…'"
+        :status-animated="terminal?.running"
+      >
+        <template v-if="terminal?.running" #status-extra>
+          <span class="text-xs text-[var(--ui-text-muted)]">
+            PID <span class="font-mono text-[var(--ui-text)]">{{ terminal.pid || '-' }}</span>
+            <span v-if="terminal.uptime" class="ml-2">已运行 {{ terminal.uptime }}</span>
+          </span>
         </template>
-        <div class="space-y-3">
-          <div v-if="terminal" class="flex items-center gap-3">
-            <UBadge :color="terminal.running ? 'success' : 'neutral'" variant="soft" size="md">
-              <template #leading>
-                <UIcon :name="terminal.running ? 'i-lucide-activity' : 'i-lucide-power-off'" :class="terminal.running ? 'w-4 h-4 heartbeat' : 'w-4 h-4'" />
-              </template>
-              {{ terminal.running ? '运行中' : '未运行' }}
-            </UBadge>
-            <span v-if="terminal.running" class="text-xs text-[var(--ui-text-muted)]">
-              PID <span class="font-mono text-[var(--ui-text)]">{{ terminal.pid || '-' }}</span>
-              <span v-if="terminal.uptime" class="ml-2">已运行 {{ terminal.uptime }}</span>
-            </span>
-          </div>
-          <div v-else class="text-[var(--ui-text-muted)] text-sm">检查中…</div>
-          <div class="flex flex-wrap gap-2">
-            <UButton color="neutral" variant="outline" size="sm" :disabled="!terminal?.running" @click="$router.push('/terminal')">打开</UButton>
-          </div>
-        </div>
-      </UCard>
+        <template #actions>
+          <UButton color="neutral" variant="outline" size="sm" :disabled="!terminal?.running" @click="$router.push('/terminal')">打开</UButton>
+        </template>
+      </StatusCard>
     </div>
 
     <!-- 版本与日志 -->
@@ -347,13 +314,4 @@ onUnmounted(() => {
   </div>
 </template>
 
-<style scoped>
-.heartbeat {
-  animation: heartbeat 1.4s ease-in-out infinite;
-}
 
-@keyframes heartbeat {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.6; transform: scale(1.15); }
-}
-</style>
