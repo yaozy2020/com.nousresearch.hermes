@@ -111,27 +111,34 @@ def filter_pending_items(pending: list[str], changelog: str) -> list[str]:
 
 
 def recent_tags(n: int = 5) -> list[tuple[str, str]]:
-    """读取最近 n 个 git tag。CI 模式下默认禁用以避免非确定性。"""
+    """读取最近 n 个 git tag（按版本号降序）。"""
     import os
     if os.environ.get("AUDIT_NO_GIT") == "1":
         return []
     try:
+        # 直接列出所有 tag，按版本号排序后取前 n 个
         out = subprocess.check_output(
-            ["git", "log", "--tags", "--simplify-by-decoration",
-             "--pretty=%ci %D", "-n", "30"],
+            ["git", "tag", "-l"],
             cwd=ROOT, encoding="utf-8", stderr=subprocess.DEVNULL,
         )
+        tags = [t.strip() for t in out.splitlines() if t.strip()]
+        # 按版本号降序排序（v0.31.2 > v0.31.1 > v0.30.8）
+        tags.sort(key=lambda t: [int(x) for x in t.lstrip("v").split(".")], reverse=True)
+        result = []
+        for tag in tags[:n]:
+            # 获取 tag 对应的 commit 日期
+            try:
+                date_out = subprocess.check_output(
+                    ["git", "log", "-1", "--format=%ci", tag],
+                    cwd=ROOT, encoding="utf-8", stderr=subprocess.DEVNULL,
+                ).strip()
+                date = date_out.split(" ", 1)[0] if date_out else ""
+            except Exception:
+                date = ""
+            result.append((tag, date))
+        return result
     except Exception:
         return []
-    result = []
-    for line in out.splitlines():
-        m = re.search(r"tag:\s*(v[\d.]+)", line)
-        if m:
-            date = line.split(" ", 1)[0]
-            result.append((m.group(1), date))
-            if len(result) >= n:
-                break
-    return result
 
 
 def render() -> str:
