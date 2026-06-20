@@ -3,12 +3,12 @@
 > ⚠️ 本文件由 `scripts/gen-audit.py` 自动生成，请勿手工编辑。
 > 数据源：manifest / tests / cmd / server modules / git tags。
 
-## 当前版本：v0.30.8
+## 当前版本：v0.31.0
 
-- **生成时间**：2026-06-20 18:08:17 +0800
-- **测试用例**：86 个 / 13 个文件
+- **生成时间**：2026-06-20 18:43:29 +0800
+- **测试用例**：107 个 / 15 个文件
 - **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
-- **后端模块**：15 个
+- **后端模块**：17 个
 - **CI Workflow**：ci.yml, release.yml
 
 ## 代码审计摘要
@@ -28,14 +28,16 @@
 
 | 模块 | 行数 |
 |:-----|:----:|
+| `auth.js` | 159 |
 | `backup.js` | 102 |
 | `config.js` | 251 |
 | `error.js` | 29 |
-| `hermes.js` | 487 |
+| `hermes.js` | 490 |
 | `i18n.js` | 43 |
 | `logger.js` | 151 |
 | `openapi.js` | 110 |
 | `providers.js` | 92 |
+| `rate-limit.js` | 108 |
 | `security.js` | 133 |
 | `static.js` | 86 |
 | `terminal-shell.js` | 101 |
@@ -60,9 +62,7 @@
 
 ## 最近发布记录
 
-| 版本 | 发布日期 |
-|:-----|:----:|
-| `v0.30.7` | 2026-06-20 |
+（git 标签信息不可用）
 
 ## 待持续推进项
 
