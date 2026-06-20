@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.31.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.31.0)
+[![Version](https://img.shields.io/badge/version-0.31.1-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.31.1)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,28 @@ bash build.sh
 
 ## 版本历史
 
-### v0.31.0（当前版本）
+### v0.31.1（当前版本）
+
+`hermes.js` 重构 + 子模块化，**无功能变更**，纯结构优化。
+
+**拆分结构**：
+
+| 子模块 | 行数 | 职责 |
+|:----|:----:|:----|
+| `hermes/paths.js` | 23 | 路径常量 SSOT |
+| `hermes/dashboard-env.js` | 43 | `.env` 动态读取（端口/访问模式） |
+| `hermes/proc-utils.js` | 80 | 端口占用 / PID 存活 / uptime 格式化 |
+| `hermes/gateway.js` | 89 | Gateway 进程生命周期 |
+| `hermes/dashboard.js` | 111 | Dashboard 进程生命周期 |
+| `hermes/install.js` | 166 | pip 安装 / 包名校验 / 整体重启 |
+| `hermes.js` (facade) | 32 | 重新导出，**对外 API 完全不变** |
+
+- 单文件最大行数：490 → 166
+- `index.js` **零改动**（facade 保留全部 17 个原导出）
+- `pipeStream` 子进程日志转发逻辑提取为模块内复用
+- 新增 `tests/hermes-modules.test.js`（25 用例），总 103 → **128 用例全过**
+
+### v0.31.0
 
 API token 鉴权 + rate limit + GitHub fallback 默认禁用。
 

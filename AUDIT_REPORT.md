@@ -3,10 +3,10 @@
 > ⚠️ 本文件由 `scripts/gen-audit.py` 自动生成，请勿手工编辑。
 > 数据源：manifest / tests / cmd / server modules / git tags。
 
-## 当前版本：v0.31.0
+## 当前版本：v0.31.1
 
-- **生成时间**：2026-06-20 18:43:29 +0800
-- **测试用例**：107 个 / 15 个文件
+- **生成时间**：2026-06-20 18:58:38 +0800
+- **测试用例**：133 个 / 16 个文件
 - **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
 - **后端模块**：17 个
 - **CI Workflow**：ci.yml, release.yml
@@ -32,7 +32,7 @@
 | `backup.js` | 102 |
 | `config.js` | 251 |
 | `error.js` | 29 |
-| `hermes.js` | 490 |
+| `hermes.js` | 32 |
 | `i18n.js` | 43 |
 | `logger.js` | 151 |
 | `openapi.js` | 110 |
