@@ -135,7 +135,7 @@ bash build.sh
 
 ### v0.27.0
 
-基础设施周 — 自检 / API 鲁棒性 / CI 工程化：
+自检 / API 鲁棒性 / CI 工程化与中文乱码修复：
 
 - **状态总览健康自检**：新增 `GET /api/diagnostics` 一次性检查 8 项（Bun、hermes-agent、Gateway / Dashboard 进程、Provider Key / 选择、监听模式、ttyd 二进制）；首页一个按钮触发，OK / 警告 / 错误三色展开。
 - **API base 鲁棒化**：`index.html` 启动时把推断到的网关前缀写入 `<meta name="hermes-api-base">`，`useApi` / `useLogStream` 优先读 meta，回落 URL 正则；fnOS 网关路径变化时不会再 fetch 拼错。
