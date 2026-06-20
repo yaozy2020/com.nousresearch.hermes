@@ -1,2 +1,51 @@
 #!/bin/bash
+
+### install_init — 安装前环境检查
+### 检查关键依赖（Bun / Node.js / Python）和磁盘空间，写入日志
+
+LOG_FILE="${TRIM_PKGVAR}/hermes-install.log"
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
+}
+
+log_msg "=== install_init started ==="
+
+# 检查 Bun
+if command -v bun >/dev/null 2>&1; then
+    BUN_VER=$(bun --version 2>/dev/null || echo "unknown")
+    log_msg "bun found: ${BUN_VER}"
+else
+    log_msg "WARNING: bun not found in PATH"
+fi
+
+# 检查 Node.js
+if command -v node >/dev/null 2>&1; then
+    NODE_VER=$(node --version 2>/dev/null || echo "unknown")
+    log_msg "node found: ${NODE_VER}"
+else
+    log_msg "WARNING: node not found in PATH"
+fi
+
+# 检查 Python
+PYTHON_BIN="/var/apps/python312/target/bin/python3"
+if [ -x "${PYTHON_BIN}" ]; then
+    PY_VER=$("${PYTHON_BIN}" --version 2>&1 || echo "unknown")
+    log_msg "python found: ${PY_VER}"
+else
+    log_msg "WARNING: python not found at ${PYTHON_BIN}"
+fi
+
+# 检查 @apphome 磁盘空间（至少 500MB）
+APP_HOME_DIR="${TRIM_PKGHOME:-/var/apps/com.nousresearch.hermes/home}"
+if [ -d "$(dirname "${APP_HOME_DIR}")" ]; then
+    AVAIL_KB=$(df -P "$(dirname "${APP_HOME_DIR}")" 2>/dev/null | tail -1 | awk '{print $4}')
+    if [ -n "${AVAIL_KB}" ] && [ "${AVAIL_KB}" -gt 512000 ]; then
+        log_msg "disk space ok: ${AVAIL_KB} KB available"
+    else
+        log_msg "WARNING: low disk space: ${AVAIL_KB:-unknown} KB"
+    fi
+fi
+
+log_msg "install_init checks done"
 exit 0

@@ -1,2 +1,36 @@
 #!/bin/bash
+
+### upgrade_init — 升级前检查
+### 检查旧版本运行状态、保留标记，写入日志
+
+LOG_FILE="${TRIM_PKGVAR}/hermes-upgrade.log"
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
+}
+
+log_msg "=== upgrade_init started ==="
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(dirname "$SCRIPT_DIR")"
+MAIN="${APP_ROOT}/cmd/main"
+
+# 检查旧版本是否在运行
+if [ -x "${MAIN}" ]; then
+    if "${MAIN}" status >/dev/null 2>&1; then
+        log_msg "old version is running, will restart after upgrade"
+    else
+        log_msg "old version not running"
+    fi
+else
+    log_msg "main script not found (fresh install?)"
+fi
+
+# 检查保留运行环境标记
+MARKER="${TRIM_PKGHOME}/.qwenpaw_keep_runtime"
+if [ -f "${MARKER}" ]; then
+    log_msg "detected keep-runtime marker, upgrade will preserve venv/data"
+fi
+
+log_msg "upgrade_init checks done"
 exit 0
