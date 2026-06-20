@@ -40,6 +40,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Set VITE_BASE_PATH for fnOS
+        run: echo "VITE_BASE_PATH=/app/com-nousresearch-hermes/" >> "$GITHUB_ENV"
+
       - name: Install root deps (no scripts)
         run: |
           if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
