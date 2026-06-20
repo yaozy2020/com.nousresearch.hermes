@@ -115,7 +115,7 @@ bash build.sh
 
 ### v0.30.2（当前版本）
 
-任务模式合并版 — i18n / Marketplace API / Backup / OpenAPI / 移动端 ttyd 体验一次性收尾：
+优化合并版 — i18n / Marketplace API / Backup / OpenAPI / 移动端 ttyd 体验收尾：
 
 - **i18n 框架**：`server/modules/i18n.js` + `zh-CN.json` 字典加载，diagnostics 全部文案走 `t(key)`，源中文字面量大幅减少（与 native2ascii 兜底并存）。
 - **Provider Marketplace 后端 API**：`/api/providers/user` GET / POST / DELETE 管理用户自定义 provider，自动叠加在内置 11 个之上；name 冲突 / env_key 格式 / base_url 协议严格校验。
