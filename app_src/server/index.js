@@ -1,7 +1,7 @@
 // @bun
 // app_src/server/index.js — Hermes 面板入口（模块化后）
 import { existsSync, chmodSync, readFileSync } from "fs";
-import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig } from "./modules/config.js";
+import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig, initConfigModule } from "./modules/config.js";
 import { wsClients, readLogs, log } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
 
@@ -19,7 +19,7 @@ import { isSafeWriteRequest, isSafeReadRequest } from "./modules/security.js";
 import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
-  installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec
+  installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec, initHermesModule
 } from "./modules/hermes.js";
 import { isTtydAlive, getTtydPid, getTtydPort, getTtydUptime, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
@@ -123,6 +123,21 @@ async function handleRequest(req) {
   if (pathname.startsWith("/api/")) {
     if (!isSafeWriteRequest(req)) {
       return errorResponse("Forbidden: untrusted origin", "FORBIDDEN_ORIGIN", 403);
+    }
+
+    if (pathname === "/api/providers/presets" && method === "GET") {
+      try {
+        // 优先从用户可覆盖的位置读取，回落到内置 modules/providers.json
+        const userPath = `${DATA_DIR}/providers.json`;
+        const builtinPath = `${import.meta.dir}/modules/providers.json`;
+        const path = existsSync(userPath) ? userPath : builtinPath;
+        const raw = readFileSync(path, "utf-8");
+        const parsed = JSON.parse(raw);
+        return json({ ok: true, source: path === userPath ? "user" : "builtin", ...parsed });
+      } catch (err) {
+        log("config", "warn", "providers.json load failed:", err.message);
+        return json({ ok: false, error: String(err.message || err), presets: [] }, 500);
+      }
     }
 
     if (pathname === "/api/health" && method === "GET") {
@@ -261,9 +276,19 @@ async function handleRequest(req) {
       });
     }
     if (pathname === "/api/terminal/send" && method === "POST") {
+      // 注意：本接口直接把 stdin 字节流转发给 ttyd 后端 WebSocket。
+      // terminal-shell.js 的命令白名单只在 ttyd 启动时校验 argv，
+      // 启动后子命令（如 hermes setup）的交互式输入由该子命令自身负责处理。
+      // 这里仅做长度限制，防止超大 payload DoS。
       const body = await safeParseBody(req);
       if (body instanceof Response) return body;
       const seq = (body && body.input) || (body && body.cmd) || (body && body.data) || "";
+      if (typeof seq !== "string") {
+        return json({ ok: false, error: "invalid payload" }, 400);
+      }
+      if (seq.length > 4096) {
+        return json({ ok: false, error: "payload too large (>4KB)" }, 413);
+      }
       if (!activeTerminalBackend || activeTerminalBackend.readyState !== WebSocket.OPEN) {
         return json({ ok: false, error: "终端未连接" }, 400);
       }
@@ -330,6 +355,10 @@ async function handleRequest(req) {
 
   return serveStatic(pathname);
 }
+
+// 启动前显式初始化关键模块（避免依赖模块顶层副作用）
+initConfigModule();
+initHermesModule();
 
 const server = Bun.serve({
   unix: SOCKET_PATH,

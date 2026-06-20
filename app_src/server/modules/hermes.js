@@ -15,7 +15,23 @@ const DASHBOARD_PID_FILE = `${RUNTIME_DIR}/dashboard.pid`;
 const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
 
 for (const d of [LOG_DIR, RUNTIME_DIR]) {
-  if (!existsSync(d)) mkdirSync(d, { recursive: true });
+  // 模块顶层 mkdir 是历史遗留：测试导入此模块时也会触发，
+  // 因此用 try/catch 静默 EACCES，正式启动由 index.js 显式初始化。
+  try {
+    if (!existsSync(d)) mkdirSync(d, { recursive: true });
+  } catch { /* test env may lack write perm */ }
+}
+
+// 显式初始化：由 index.js 在启动时调用，确保关键目录存在
+let _hermesInited = false;
+export function initHermesModule() {
+  if (_hermesInited) return;
+  _hermesInited = true;
+  for (const d of [LOG_DIR, RUNTIME_DIR]) {
+    try {
+      if (!existsSync(d)) mkdirSync(d, { recursive: true });
+    } catch { /* logger will surface error if perms truly missing */ }
+  }
 }
 
 function isPortInUse(port, host = "127.0.0.1") {
@@ -377,10 +393,19 @@ export async function installHermes(packageSpec) {
     })();
     const exitCode = await installProc.exited;
     if (exitCode !== 0) {
-      broadcastLog(`[install] pip install failed (exit ${exitCode}), trying GitHub source ...\n`);
+      // 显式 fallback：默认从 PyPI 失败后回退 GitHub 官方源；
+      // 用户可设 HERMES_NO_FALLBACK=1 关闭，避免在限网环境下意外外联。
+      if (process.env.HERMES_NO_FALLBACK === "1") {
+        broadcastLog(`[install] ❌ pip install failed (exit ${exitCode}). HERMES_NO_FALLBACK=1, GitHub fallback disabled.\n`);
+        installInProgress = false;
+        return { ok: false, error: `pip install failed (exit ${exitCode}). Fallback disabled by HERMES_NO_FALLBACK=1.` };
+      }
+      broadcastLog(`[install] ⚠️ pip install failed (exit ${exitCode}). Falling back to GitHub: ${OFFICIAL_GIT_SPEC}\n`);
+      broadcastLog(`[install]    To disable this fallback, set HERMES_NO_FALLBACK=1 in .env.\n`);
       const ghProc = Bun.spawn([pip, "install", OFFICIAL_GIT_SPEC, "-q"], { stdout: "pipe", stderr: "pipe" });
       const ghExit = await ghProc.exited;
       if (ghExit !== 0) { installInProgress = false; return { ok: false, error: `pip install failed (exit ${exitCode}, github ${ghExit})` }; }
+      broadcastLog(`[install] ✓ GitHub fallback succeeded.\n`);
     }
     if (!existsSync(HERMES_BIN)) { installInProgress = false; return { ok: false, error: "hermes binary not found after install" }; }
     try { chmodSync(HERMES_BIN, 493); } catch (err) {

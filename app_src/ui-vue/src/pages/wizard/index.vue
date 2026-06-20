@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { api } from '@/composables/useApi'
+import { useLogStream } from '@/composables/useLogStream'
 
 interface HermesStatus { installed: boolean; bin?: string }
 interface GatewayStatus { running: boolean; pid?: number }
 interface DashboardStatus { running: boolean; pid?: number; port?: number; insecure?: boolean }
 interface ConfigResponse { yaml?: string; env?: string }
+
+interface ProviderPreset {
+  id: string
+  name: string
+  base_url: string
+  env_key: string
+  tag: string
+  editable_url: boolean
+  recommend?: string
+}
 
 const toast = useToast()
 function notify(message: string, type: 'success' | 'error' | 'warning' | 'info' = 'info') {
@@ -29,25 +40,38 @@ const dashboard = ref<DashboardStatus | null>(null)
 const config = ref<ConfigResponse>({})
 const loading = ref(false)
 
-const providers = [
-  { id: 'openrouter', name: 'OpenRouter', base_url: 'https://openrouter.ai/api/v1', env_key: 'OPENROUTER_API_KEY', tag: '聚合 · 推荐', editable_url: false },
-  { id: 'opencode-zen', name: 'OpenCode Zen', base_url: 'https://opencode.ai/zen/v1', env_key: 'OPENCODE_ZEN_API_KEY', tag: '聚合 · 含免费', editable_url: true },
-  { id: 'opencode-go', name: 'OpenCode Go', base_url: 'https://opencode.ai/go/v1', env_key: 'OPENCODE_GO_API_KEY', tag: '订阅', editable_url: true },
-  { id: 'deepseek', name: 'DeepSeek', base_url: 'https://api.deepseek.com/v1', env_key: 'DEEPSEEK_API_KEY', tag: '国内直连', editable_url: false },
-  { id: 'glm', name: '智谱 GLM', base_url: 'https://open.bigmodel.cn/api/paas/v4', env_key: 'GLM_API_KEY', tag: '国内直连', editable_url: false },
-  { id: 'kimi', name: 'Moonshot Kimi', base_url: 'https://api.moonshot.cn/v1', env_key: 'KIMI_API_KEY', tag: '国内直连', editable_url: false },
-  { id: 'minimax', name: 'MiniMax', base_url: 'https://api.minimax.chat/v1', env_key: 'MINIMAX_API_KEY', tag: '国内直连', editable_url: false },
-  { id: 'anthropic', name: 'Anthropic', base_url: 'https://api.anthropic.com', env_key: 'ANTHROPIC_API_KEY', tag: '国际', editable_url: false },
-  { id: 'gemini', name: 'Google Gemini', base_url: 'https://generativelanguage.googleapis.com/v1beta', env_key: 'GOOGLE_API_KEY', tag: '国际', editable_url: false },
-  { id: 'openai', name: 'OpenAI', base_url: 'https://api.openai.com/v1', env_key: 'OPENAI_API_KEY', tag: '国际', editable_url: false },
+// 默认内置列表（fallback）；优先从后端 /api/providers/presets 拉取
+const DEFAULT_PROVIDERS: ProviderPreset[] = [
+  { id: 'deepseek', name: 'DeepSeek', base_url: 'https://api.deepseek.com/v1', env_key: 'DEEPSEEK_API_KEY', tag: '国内直连', editable_url: false, recommend: '🟢 推荐：国内访问稳定，价格低，中文表现好，适合大多数用户首选' },
+  { id: 'glm', name: '智谱 GLM', base_url: 'https://open.bigmodel.cn/api/paas/v4', env_key: 'GLM_API_KEY', tag: '国内直连', editable_url: false, recommend: '🟢 国产备选：免费额度大，GLM-4 系列长上下文表现好' },
+  { id: 'kimi', name: 'Moonshot Kimi', base_url: 'https://api.moonshot.cn/v1', env_key: 'KIMI_API_KEY', tag: '国内直连', editable_url: false, recommend: '🟢 长文本场景：128K~200K 上下文，适合阅读长文档' },
+  { id: 'minimax', name: 'MiniMax', base_url: 'https://api.minimax.chat/v1', env_key: 'MINIMAX_API_KEY', tag: '国内直连', editable_url: false, recommend: '🟢 国内直连：支持函数调用与多模态，价格中等' },
+  { id: 'openrouter', name: 'OpenRouter', base_url: 'https://openrouter.ai/api/v1', env_key: 'OPENROUTER_API_KEY', tag: '聚合 · 推荐', editable_url: false, recommend: '🔵 进阶：一个 Key 用 200+ 模型，需海外网络/代理' },
+  { id: 'opencode-zen', name: 'OpenCode Zen', base_url: 'https://opencode.ai/zen/v1', env_key: 'OPENCODE_ZEN_API_KEY', tag: '聚合 · 含免费', editable_url: true, recommend: '🔵 海外聚合：含免费额度，适合编程类任务' },
+  { id: 'opencode-go', name: 'OpenCode Go', base_url: 'https://opencode.ai/go/v1', env_key: 'OPENCODE_GO_API_KEY', tag: '订阅', editable_url: true, recommend: '🔵 海外订阅：包月固定价，适合重度用户' },
+  { id: 'anthropic', name: 'Anthropic', base_url: 'https://api.anthropic.com', env_key: 'ANTHROPIC_API_KEY', tag: '国际', editable_url: false, recommend: '🔵 国际：Claude 系列，需海外网络与官方账号' },
+  { id: 'gemini', name: 'Google Gemini', base_url: 'https://generativelanguage.googleapis.com/v1beta', env_key: 'GOOGLE_API_KEY', tag: '国际', editable_url: false, recommend: '🔵 国际：Google Gemini 系列，免费层有限制' },
+  { id: 'openai', name: 'OpenAI', base_url: 'https://api.openai.com/v1', env_key: 'OPENAI_API_KEY', tag: '国际', editable_url: false, recommend: '🔵 国际：GPT 系列原厂，需海外网络与官方账号' },
 ]
+const providers = ref<ProviderPreset[]>([...DEFAULT_PROVIDERS])
+
+async function loadProviderPresets() {
+  try {
+    const r = await api<{ ok: boolean; presets?: ProviderPreset[] }>('api/providers/presets')
+    if (r.ok && Array.isArray(r.presets) && r.presets.length > 0) {
+      providers.value = r.presets
+    }
+  } catch {
+    // 静默 fallback 到 DEFAULT_PROVIDERS
+  }
+}
 
 const selectedProvider = ref<string | null>(null)
 const providerBaseUrl = ref('')
 const providerApiKey = ref('')
 
 function selectedProviderInfo() {
-  return providers.find(p => p.id === selectedProvider.value) || null
+  return providers.value.find(p => p.id === selectedProvider.value) || null
 }
 
 async function initWizard() {
@@ -89,27 +113,53 @@ function prevStep() {
   if (currentStep.value > 1) currentStep.value--
 }
 
+// 安装日志流（步骤 1 实时进度）
+const installLog = useLogStream(300)
+const installElapsed = ref(0)
+let installTimer: ReturnType<typeof setInterval> | null = null
+
 async function installHermes() {
   loading.value = true
+  installLog.clear()
+  installLog.start()
+  installElapsed.value = 0
+  if (installTimer) clearInterval(installTimer)
+  installTimer = setInterval(() => { installElapsed.value++ }, 1000)
   try {
     const r = await api<{ ok: boolean; error?: string }>('api/hermes/install', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ package: 'hermes-agent' }),
     })
-    if (r.ok) notify('安装完成', 'success')
-    else notify(r.error || '安装失败', 'error')
+    if (r.ok) {
+      notify('Hermes 安装完成 ✓', 'success')
+      // U3: 装完 1.5s 自动跳到下一步
+      setTimeout(() => {
+        if (currentStep.value === 1) nextStep()
+      }, 1500)
+    } else {
+      notify(r.error || '安装失败', 'error')
+    }
   } catch (e: unknown) {
     const err = e as Error
     notify('安装失败: ' + (err?.message ?? String(e)), 'error')
   } finally {
+    if (installTimer) { clearInterval(installTimer); installTimer = null }
+    // 留住日志面板，供用户自行查看；只关闭 ws
+    setTimeout(() => installLog.stop(), 3000)
     await initWizard()
   }
 }
 
+const installElapsedDisplay = computed(() => {
+  const m = Math.floor(installElapsed.value / 60)
+  const s = installElapsed.value % 60
+  return `${m}:${String(s).padStart(2, '0')}`
+})
+
 function selectProvider(id: string) {
   selectedProvider.value = id
-  const p = providers.find(x => x.id === id)
+  const p = providers.value.find(x => x.id === id)
   if (p) providerBaseUrl.value = p.base_url
   providerApiKey.value = ''
 }
@@ -205,7 +255,10 @@ function skipWizard() {
   notify('已跳过向导', 'info')
 }
 
-onMounted(initWizard)
+onMounted(async () => {
+  await loadProviderPresets()
+  await initWizard()
+})
 </script>
 
 <template>
@@ -269,8 +322,16 @@ onMounted(initWizard)
       </div>
       <div v-else class="space-y-3">
         <UBadge color="neutral" variant="soft"><UIcon name="i-lucide-stop-circle" class="w-4 h-4 mr-1" />未安装</UBadge>
-        <p class="text-sm text-[var(--ui-text-muted)]">点击下方按钮一键安装 hermes-agent (PyPI)。安装可能需要 1-3 分钟。</p>
-        <UButton color="primary" :loading="loading" @click="installHermes">一键安装</UButton>
+        <p class="text-sm text-[var(--ui-text-muted)]">点击下方按钮一键安装 hermes-agent (PyPI)。安装通常需要 1-3 分钟，期间可观察实时日志。</p>
+        <div class="flex items-center gap-3">
+          <UButton color="primary" :loading="loading" @click="installHermes">一键安装</UButton>
+          <span v-if="loading" class="text-xs text-[var(--ui-text-muted)] font-mono">已用时 {{ installElapsedDisplay }}</span>
+        </div>
+        <!-- 实时安装日志面板 -->
+        <div v-if="loading || installLog.lines.value.length > 0" class="mt-3 border border-[var(--ui-border)] rounded-lg bg-black text-green-300 font-mono text-xs leading-relaxed max-h-72 overflow-auto p-3">
+          <div v-if="installLog.lines.value.length === 0" class="text-gray-500">等待日志输出 ...</div>
+          <div v-for="(line, i) in installLog.lines.value" :key="i" class="whitespace-pre-wrap break-all">{{ line }}</div>
+        </div>
       </div>
     </UCard>
 
@@ -293,6 +354,7 @@ onMounted(initWizard)
           <div class="font-semibold text-[var(--ui-text)]">{{ p.name }}</div>
           <div class="text-xs font-mono text-[var(--ui-text-muted)] mt-1 break-all">{{ p.base_url }}</div>
           <UBadge color="neutral" variant="soft" size="xs" class="mt-2">{{ p.tag }}</UBadge>
+          <div v-if="p.recommend" class="text-xs text-[var(--ui-text-muted)] mt-2 leading-snug">{{ p.recommend }}</div>
         </div>
       </div>
 
@@ -304,6 +366,14 @@ onMounted(initWizard)
         <UFormField v-if="selectedProviderInfo()?.env_key" label="API Key（可选）" hint="留空则跳过，到 Dashboard 再填">
           <UInput v-model="providerApiKey" type="password" class="w-full" />
         </UFormField>
+        <UAlert
+          v-if="selectedProviderInfo()?.env_key && !providerApiKey.trim()"
+          color="warning"
+          variant="subtle"
+          icon="i-lucide-alert-triangle"
+          title="未填写 API Key"
+          description="保存后可继续，但 Gateway 在调用 LLM 时会返回 401 未授权。建议现在填写或稍后到「配置」页补全。"
+        />
       </div>
 
       <div class="flex justify-between mt-4">

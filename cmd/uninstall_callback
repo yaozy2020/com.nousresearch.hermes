@@ -9,13 +9,14 @@
 ### 兼容旧 wizard 的 wizard_keep_data：false 表示全部删除，其他表示全部保留
 ### 不论选哪种，瞬态 socket / pid / 临时目录都会被清掉
 
-# 生成一个应用用户自己拥有、且所有用户可读的日志文件
+# 生成一个应用用户自己拥有、且 owner 可读写的日志文件
 LOG_PATH="$(mktemp /tmp/hermes-uninstall-callback.XXXXXX.log)"
-chmod 666 "$LOG_PATH" 2>/dev/null || true
+chmod 600 "$LOG_PATH" 2>/dev/null || true
 echo "LOG_PATH=$LOG_PATH" > /tmp/hermes-uninstall-callback.latest
-chmod 666 /tmp/hermes-uninstall-callback.latest 2>/dev/null || true
+chmod 644 /tmp/hermes-uninstall-callback.latest 2>/dev/null || true
 exec >> "$LOG_PATH" 2>&1
-set -x
+# 仅在 HERMES_DEBUG=1 时打开 set -x，避免环境变量泄露到日志
+[ "${HERMES_DEBUG}" = "1" ] && set -x
 
 # TRIM_PKGHOME 在某些 fnOS 场景下可能为空，做兜底
 if [ -z "${TRIM_PKGHOME}" ]; then
@@ -158,6 +159,17 @@ if [ -d "$DATA_DIR" ]; then
         rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
       fi
     done
+    # P5: 备份目录单独控制，仅在用户未勾选「保留升级备份」时清理
+    KEEP_BACKUPS="${wizard_keep_backups:-true}"
+    if [ "${KEEP_BACKUPS}" != "true" ]; then
+      TARGET="${DATA_DIR}/backups"
+      if [ -e "$TARGET" ]; then
+        log "  removing backups dir ${TARGET} (wizard_keep_backups=false) ..."
+        rm -rf "$TARGET" 2>/dev/null || log "    failed to remove ${TARGET}"
+      fi
+    else
+      log "  keep backups dir (wizard_keep_backups=true)"
+    fi
     for TARGET in "${DATA_DIR}"/.*; do
       case "$TARGET" in
         "${DATA_DIR}/."*|"${DATA_DIR}/..") continue ;;

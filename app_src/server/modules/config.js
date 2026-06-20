@@ -10,7 +10,6 @@ const CONFIG_DIR = process.env.HERMES_CONFIG_DIR || HERMES_HOME;
 // Hermes 读取配置的位置是 HERMES_HOME 下的 config.yaml / .env。
 // 旧版本 (< v0.23.7) 把配置写在 ${DATA_DIR}/config，导致改配置不生效；
 // 启动时如果新位置没有文件而旧位置有，自动迁移一次。
-if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
 const LEGACY_CONFIG_DIR = `${DATA_DIR}/config`;
 function migrateConfigFile(name) {
   const src = `${LEGACY_CONFIG_DIR}/${name}`;
@@ -21,8 +20,20 @@ function migrateConfigFile(name) {
     }
   }
 }
-migrateConfigFile("config.yaml");
-migrateConfigFile(".env");
+
+// 显式初始化：由 index.js 在启动时调用一次，避免模块顶层副作用
+let _configInited = false;
+export function initConfigModule() {
+  if (_configInited) return;
+  _configInited = true;
+  try {
+    if (!existsSync(CONFIG_DIR)) mkdirSync(CONFIG_DIR, { recursive: true });
+  } catch (err) {
+    swallowError("create config dir", err);
+  }
+  migrateConfigFile("config.yaml");
+  migrateConfigFile(".env");
+}
 
 // 需要脱敏显示的敏感字段（大小写不敏感匹配）
 const SENSITIVE_KEY_PATTERNS = [

@@ -77,6 +77,15 @@ const VALID_LEVELS = new Set(["error", "warn", "info", "debug"]);
  * 兼容旧调用：log("info", ...args) -> source="panel"
  * 新调用：  log("gateway", "info", ...args) -> source="gateway"
  */
+// 节流：clean up 是 readdir + statSync × N，对热路径不友好；6 小时跑一次足够
+let _lastCleanupAt = 0;
+function maybeCleanupOldLogs() {
+  const now = Date.now();
+  if (now - _lastCleanupAt < 6 * 60 * 60 * 1000) return;
+  _lastCleanupAt = now;
+  cleanupOldLogs();
+}
+
 export function log(levelOrSource, ...args) {
   let source = "panel";
   let level = levelOrSource;
@@ -91,7 +100,7 @@ export function log(levelOrSource, ...args) {
   else if (level === "warn") console.warn(line);
   else console.log(line);
   secureAppendFileSync(getLogFileName(), line);
-  cleanupOldLogs();
+  maybeCleanupOldLogs();
 }
 
 /**

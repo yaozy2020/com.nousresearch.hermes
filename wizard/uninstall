@@ -22,6 +22,13 @@
       },
       {
         "type": "switch",
+        "field": "wizard_keep_backups",
+        "label": "保留升级备份",
+        "initValue": "true",
+        "helpText": "如果勾选，将保留 data/backups/ 目录中的历史 .env / config.yaml 备份。仅在删除运行环境时生效。"
+      },
+      {
+        "type": "switch",
         "field": "wizard_confirm_uninstall",
         "label": "我已了解风险，确认卸载",
         "initValue": "false",
@@ -35,3 +42,4 @@
     ]
   }
 ]
+

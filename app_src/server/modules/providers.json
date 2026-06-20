@@ -1,0 +1,104 @@
+{
+  "version": 1,
+  "presets": [
+    {
+      "id": "deepseek",
+      "name": "DeepSeek",
+      "base_url": "https://api.deepseek.com/v1",
+      "env_key": "DEEPSEEK_API_KEY",
+      "tag": "国内直连",
+      "editable_url": false,
+      "recommend": "🟢 推荐：国内访问稳定，价格低，中文表现好，适合大多数用户首选"
+    },
+    {
+      "id": "glm",
+      "name": "智谱 GLM",
+      "base_url": "https://open.bigmodel.cn/api/paas/v4",
+      "env_key": "GLM_API_KEY",
+      "tag": "国内直连",
+      "editable_url": false,
+      "recommend": "🟢 国产备选：免费额度大，GLM-4 系列长上下文表现好"
+    },
+    {
+      "id": "kimi",
+      "name": "Moonshot Kimi",
+      "base_url": "https://api.moonshot.cn/v1",
+      "env_key": "KIMI_API_KEY",
+      "tag": "国内直连",
+      "editable_url": false,
+      "recommend": "🟢 长文本场景：128K~200K 上下文，适合阅读长文档"
+    },
+    {
+      "id": "minimax",
+      "name": "MiniMax",
+      "base_url": "https://api.minimax.chat/v1",
+      "env_key": "MINIMAX_API_KEY",
+      "tag": "国内直连",
+      "editable_url": false,
+      "recommend": "🟢 国内直连：支持函数调用与多模态，价格中等"
+    },
+    {
+      "id": "openrouter",
+      "name": "OpenRouter",
+      "base_url": "https://openrouter.ai/api/v1",
+      "env_key": "OPENROUTER_API_KEY",
+      "tag": "聚合 · 推荐",
+      "editable_url": false,
+      "recommend": "🔵 进阶：一个 Key 用 200+ 模型，需海外网络/代理"
+    },
+    {
+      "id": "opencode-zen",
+      "name": "OpenCode Zen",
+      "base_url": "https://opencode.ai/zen/v1",
+      "env_key": "OPENCODE_ZEN_API_KEY",
+      "tag": "聚合 · 含免费",
+      "editable_url": true,
+      "recommend": "🔵 海外聚合：含免费额度，适合编程类任务"
+    },
+    {
+      "id": "opencode-go",
+      "name": "OpenCode Go",
+      "base_url": "https://opencode.ai/go/v1",
+      "env_key": "OPENCODE_GO_API_KEY",
+      "tag": "订阅",
+      "editable_url": true,
+      "recommend": "🔵 海外订阅：包月固定价，适合重度用户"
+    },
+    {
+      "id": "anthropic",
+      "name": "Anthropic",
+      "base_url": "https://api.anthropic.com",
+      "env_key": "ANTHROPIC_API_KEY",
+      "tag": "国际",
+      "editable_url": false,
+      "recommend": "🔵 国际：Claude 系列，需海外网络与官方账号"
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini",
+      "base_url": "https://generativelanguage.googleapis.com/v1beta",
+      "env_key": "GOOGLE_API_KEY",
+      "tag": "国际",
+      "editable_url": false,
+      "recommend": "🔵 国际：Google Gemini 系列，免费层有限制"
+    },
+    {
+      "id": "openai",
+      "name": "OpenAI",
+      "base_url": "https://api.openai.com/v1",
+      "env_key": "OPENAI_API_KEY",
+      "tag": "国际",
+      "editable_url": false,
+      "recommend": "🔵 国际：GPT 系列原厂，需海外网络与官方账号"
+    },
+    {
+      "id": "openai_compat",
+      "name": "OpenAI 兼容（自定义）",
+      "base_url": "https://your-endpoint.example/v1",
+      "env_key": "OPENAI_COMPAT_API_KEY",
+      "tag": "自定义",
+      "editable_url": true,
+      "recommend": "⚪ 自定义：任意 OpenAI 兼容服务（本地 Ollama / vLLM / 自建网关）"
+    }
+  ]
+}

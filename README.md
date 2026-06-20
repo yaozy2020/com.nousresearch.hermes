@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.5-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.5)
+[![Version](https://img.shields.io/badge/version-0.26.6-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.6)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,25 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.5（当前版本）
+### v0.26.6（当前版本）
+
+安全收敛与体验细节优化：
+- **终端边界明确化**：`/api/terminal/send` 增加 4KB 长度限制，并在源码注释中明示「白名单只在 ttyd 启动时校验 argv，启动后子命令的交互式输入由该子命令自身负责」。
+- **卸载日志收敛**：`cmd/uninstall_callback` 默认关闭 `set -x`（仅 `HERMES_DEBUG=1` 时启用），日志文件权限从 666 降到 600，避免环境变量泄露到 `/tmp`。
+- **PyPI 回退显式化**：Hermes 安装失败时，回退到官方 GitHub 源前会主动广播提示；可设 `HERMES_NO_FALLBACK=1` 在限网/安全场景下关闭回退。
+- **日志清理节流**：`logger.js` 中旧日志清理改为每 6 小时执行一次，避免每次写日志都做 `readdirSync + statSync` 全扫描。
+
+### 常见问题（FAQ）
+
+**Q: 卸载后还能看到 `/var/apps/com.nousresearch.hermes/` 空目录？**
+
+这是 fnOS 框架的安全设计 —— 应用以独立用户身份运行，无权删除自己的父目录。空目录会在系统下次重启或重装时由系统清理，不影响重装。
+
+**Q: 在限网环境（无外网/仅内网镜像）使用，怎么避免 pip 自动回退到 GitHub？**
+
+在「高级配置」的 `.env` 中加入 `HERMES_NO_FALLBACK=1`，再点击「重启 Hermes」即可。pip 失败时不会再尝试 GitHub。
+
+### v0.26.5
 
 修复卸载后重装仍显示旧版本的问题：
 - 修正 `cmd/uninstall_callback` 的安全路径白名单，匹配 fnOS 真实 `TRIM_PKGHOME=/vol2/@apphome/<pkg>`，不再误判为不安全路径。

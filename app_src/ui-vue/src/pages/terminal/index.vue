@@ -137,6 +137,10 @@ onMounted(refreshStatus)
     <UAlert color="info" variant="soft" icon="i-lucide-info" title="使用说明"
       description="点按钮启动命令。桌面端会在新标签页打开终端；移动端会进入全屏移动适配界面。所有终端流量均通过主应用代理，无需直接访问额外端口。" />
 
+    <UAlert color="warning" variant="subtle" icon="i-lucide-shield"
+      title="为什么不能跑别的命令？"
+      description="出于安全考虑，本终端仅允许执行 hermes setup / model / login / gateway setup / doctor / status 这 6 条受白名单保护的命令。需要完整 shell 请使用 fnOS 自带终端或 SSH 登录。" />
+
     <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
       <template #header>
         <div class="flex items-center gap-2">
