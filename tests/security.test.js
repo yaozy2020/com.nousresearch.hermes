@@ -183,14 +183,16 @@ describe("security / CSRF", () => {
 
   it("allows POST without origin from localhost", () => {
     const req = makeReq("POST", "http://192.168.10.236/api/gateway/start", {
-      host: "192.168.10.236"
+      host: "192.168.10.236",
+      "x-forwarded-for": "192.168.10.236"
     });
     assert.strictEqual(isSafeWriteRequest(req), true);
   });
 
   it("rejects POST without origin from public IP", () => {
     const req = makeReq("POST", "http://1.2.3.4/api/gateway/start", {
-      host: "1.2.3.4"
+      host: "1.2.3.4",
+      "x-forwarded-for": "1.2.3.4"
     });
     assert.strictEqual(isSafeWriteRequest(req), false);
   });
@@ -198,6 +200,7 @@ describe("security / CSRF", () => {
   it("allows POST without origin when API token provided", () => {
     const req = makeReq("POST", "http://1.2.3.4/api/gateway/start", {
       host: "1.2.3.4",
+      "x-forwarded-for": "1.2.3.4",
       authorization: "Bearer test-token-123"
     });
     assert.strictEqual(isSafeWriteRequest(req), true);

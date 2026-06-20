@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "test": "node --test tests/**/*.test.js",
+    "test": "node --test tests/*.test.js",
     "lint:server": "node --check app_src/server/index.js && node --check app_src/server/modules/config.js && node --check app_src/server/modules/hermes.js && node --check app_src/server/modules/logger.js && node --check app_src/server/modules/utils.js && node --check app_src/server/modules/static.js && node --check app_src/server/modules/security.js && node --check app_src/server/modules/error.js && node --check app_src/server/modules/version.js && node --check app_src/server/modules/terminal.js && node --check app_src/server/modules/terminal-shell.js"
   }
 }

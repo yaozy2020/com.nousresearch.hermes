@@ -1,7 +1,7 @@
 // auth.test.js — API token 鉴权单测
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync, existsSync, readFileSync, unlinkSync } from "node:fs";
+import { mkdtempSync, writeFileSync, existsSync, readFileSync, unlinkSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -104,7 +104,7 @@ describe("auth module", () => {
 
   it(".env permission is 0o600 after enableAuth", () => {
     auth.enableAuth();
-    const { mode } = require("node:fs").statSync(ENV_FILE);
+    const { mode } = statSync(ENV_FILE);
     // 检查 owner 之外是否无权限（mask 0o077）
     assert.equal(mode & 0o077, 0);
   });
