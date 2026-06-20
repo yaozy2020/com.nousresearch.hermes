@@ -1,60 +1,76 @@
 # Hermes for fnOS — 审计报告
 
-## 当前版本：v0.30.2
+> ⚠️ 本文件由 `scripts/gen-audit.py` 自动生成，请勿手工编辑。
+> 数据源：manifest / tests / cmd / server modules / git tags。
 
-### 代码审计摘要
+## 当前版本：v0.30.8
+
+- **生成时间**：2026-06-20 18:08:17 +0800
+- **测试用例**：86 个 / 13 个文件
+- **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
+- **后端模块**：15 个
+- **CI Workflow**：ci.yml, release.yml
+
+## 代码审计摘要
 
 | 维度 | 结果 | 说明 |
 |:-----|:-----|:-----|
 | 安全加固 | ✅ 已收敛 | 终端沙箱、CSRF 收紧、敏感文件 0o640/0o750、卸载路径白名单 |
 | 权限控制 | ✅ 已收敛 | socket 0o660、进程管理 PID 校验、日志 600 |
 | 输入校验 | ✅ 已收敛 | API 请求体类型检查、终端命令白名单、长度限制 |
-| 配置隔离 | ⚠️ 待改进 | `config_callback` 重启逻辑已补，但 `install_init/upgrade_init` 仍为空壳 |
+| 配置隔离 | ✅ 已收敛 | manifest 是版本号唯一真相源，sync-version.py 自动同步派生位置 |
 | 依赖管理 | ✅ 已收敛 | Python 3.12 + Bun ≥ 1.3.9 + Node.js v24，版本声明在 manifest |
 | 前端安全 | ✅ 已收敛 | 静态资源路径白名单、`X-Frame-Options`、`safe-area-inset-bottom` |
 | 中文编码 | ✅ 已收敛 | native2ascii + i18n 双保险，fnOS bun utf-8 解码 bug 已绕过 |
+| 版本治理 | ✅ 已收敛 | preflight.sh 门禁，CI/CD 自动校验版本号一致性 |
 
-### 近期关键变更
+## 后端模块清单
 
-#### v0.30.2
-- 新增 `modules/i18n.js` + `zh-CN.json`，diagnostics 文案走 `t(key)`
-- 新增 `/api/providers/user`、`/api/backup/*`、`/api/trust/*`、`/api/diagnostics/openapi`
-- ttyd 移动端工具栏重构为双排布局
-- `tests/v030-modules.test.js` 11 项新单测，78/78 全过
-- `build.sh` 扩展 native2ascii 范围
+| 模块 | 行数 |
+|:-----|:----:|
+| `backup.js` | 102 |
+| `config.js` | 251 |
+| `error.js` | 29 |
+| `hermes.js` | 487 |
+| `i18n.js` | 43 |
+| `logger.js` | 151 |
+| `openapi.js` | 110 |
+| `providers.js` | 92 |
+| `security.js` | 133 |
+| `static.js` | 86 |
+| `terminal-shell.js` | 101 |
+| `terminal.js` | 256 |
+| `trust.js` | 60 |
+| `utils.js` | 40 |
+| `version.js` | 163 |
 
-#### v0.27.0
-- 新增 `/api/diagnostics` 健康自检（8 项检查）
-- `index.html` 注入 `<meta name="hermes-api-base">`，API 路径鲁棒化
-- `.github/workflows/ci.yml` + `release.yml` 入仓
-- 修复 fnOS App WebView 中文乱码（native2ascii 打包转义）
+## 生命周期脚本清单
 
-#### v0.26.0
-- 合并 v0.25.4 ~ v0.25.8 安全加固
-- 终端沙箱化、CSRF 收紧、安装包来源限制
-- 日志按天轮转、API 类型同步、统一错误处理
+| 脚本 | 触发 |
+|:-----|:-----|
+| `cmd/config_callback` | fnOS 不自动调用（平台限制），保留以备未来兼容 |
+| `cmd/config_init` | fnOS 不自动调用（平台限制） |
+| `cmd/install_callback` | fnOS 安装完成后自动调用 |
+| `cmd/install_init` | fnOS 不自动调用，由 upgrade_callback 显式调用 |
+| `cmd/main` | 应用启动 / restart / status 入口 |
+| `cmd/uninstall_callback` | fnOS 卸载时调用 |
+| `cmd/uninstall_init` | fnOS 卸载前调用 |
+| `cmd/upgrade_callback` | fnOS 升级完成后自动调用 |
+| `cmd/upgrade_init` | fnOS 不自动调用，由 upgrade_callback 显式调用 |
 
-### 待改进项（对照 QwenPaw）
+## 最近发布记录
 
-| 项 | 状态 | 说明 |
-|:--|:-----|:-----|
-| `cmd/config_callback` 重启 | ✅ 已修复 | 复用 `cmd/main restart`，配置变更立即生效 |
-| `cmd/install_init` / `upgrade_init` | ⏳ 待完善 | 当前为 `exit 0` 空壳，建议至少加 `log_msg` 标记 |
-| Manifest `checkport` | ✅ 已修复 | 已添加 `checkport = false`（主服务为 Unix socket，不适配 TCP 端口检测） |
-| 审计报告 | ✅ 已建立 | 本文件，每次发版前更新 |
-| Issue/PR 模板 | ⏳ 待完善 | 建议加 `.github/ISSUE_TEMPLATE/` 和 `PULL_REQUEST_TEMPLATE.md` |
-| `.gitignore` 完善 | ⏳ 待检查 | 确认 `build/`、`.hermes-test-*`、`__pycache__` 已忽略 |
+| 版本 | 发布日期 |
+|:-----|:----:|
+| `v0.30.7` | 2026-06-20 |
 
-### 对比 QwenPaw (yaozy2020/QwenPaw)
+## 待持续推进项
 
-| 维度 | QwenPaw | Hermes | 结论 |
-|:-----|:--------|:-------|:-----|
-| 前端框架 | React (v1.1.12) | Vue 3 + Nuxt UI v4 | Hermes 更现代，无 CGI 开销 |
-| 部署方式 | CGI (`api.cgi` + `index.cgi`) | Bun Unix socket | Hermes 架构更优 |
-| 回调脚本 | 完整 6 步生命周期 | 3 步有空壳 | Hermes 需补齐 `install_init/upgrade_init` |
-| 多通道 | 微信/QQ/钉钉/飞书/Discord/Telegram | 5 个绿色频道 + 跳转 Dashboard | QwenPaw 更丰富，但 Hermes 走官方 Dashboard 可扩展 |
-| 打包工具 | fnpack | fnpack + build.sh | 一致 |
+- ⏳ 面板可选 token 鉴权（默认关闭，env 开启）— P2
+- ⏳ `/api/*` rate limit 令牌桶 — P2
+- ⏳ `hermes.js` 单文件 ~487 行拆分 — P3
+- ⏳ `CONTRIBUTING.md` 与 `CHANGELOG.md` 标准化 — P3
 
 ---
 
-*最后更新：2026-06-20*
+生成命令：`python3 scripts/gen-audit.py`

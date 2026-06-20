@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.30.7-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.7)
+[![Version](https://img.shields.io/badge/version-0.30.8-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.8)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,24 +110,56 @@ bash build.sh
 
 ## 版本历史
 
-### v0.30.4（当前版本）
+### v0.30.8（当前版本）
 
-在 v0.30.2 基础上补齐生命周期脚本 + manifest 字段对齐 QwenPaw 规范。
+版本治理 / 仓库结构整理 / 文档自动化。
 
-**生命周期脚本补齐**：
-- `cmd/install_init` — 安装前检查 Bun/Node.js/Python 版本 + 磁盘空间，写入 `TRIM_PKGVAR/hermes-install.log`
-- `cmd/upgrade_init` — 升级前检查旧版本运行状态 + 保留运行环境标记，写入 `TRIM_PKGVAR/hermes-upgrade.log`
-- `cmd/config_callback` — 配置变更后自动 restart（复用 `cmd/main restart`），确保 `.env` 保存后立即生效
+**版本号 SSOT（单一真相源）**：
+- 删除 `config/hermes-version.env`，`manifest` 成为版本号唯一权威源
+- `cmd/install_callback` 移除硬编码兜底 `:-0.30.3`，改为 `:-unknown`，让漏读 manifest 的故障醒目
+- 新增 `scripts/sync-version.py`：从 manifest 自动同步到 `package.json` / `build-meta.json` / README badge / README "（当前版本）" 标题 / `AUDIT_REPORT.md`
+- 新增 `scripts/preflight.sh`：发版前一致性门禁（版本号 / 仓库残留 / 弃用文件 / cmd 兜底）
+- `build.sh` 与 CI 在打包前自动调用 sync + preflight
 
-**Manifest 对齐**：
-- 新增 `checkport = false`（主服务走 Unix socket，不适配 TCP 端口检测）
-- changelog 同步更新
+**文档自动化**：
+- `AUDIT_REPORT.md` 不再人写，由 `scripts/gen-audit.py` 从代码事实自动生成（测试用例数 / 模块清单 / git tag）
+- 新增 `CONTRIBUTING.md`：开发流程、版本号治理、fnOS 平台特性
+- 新增 `.github/ISSUE_TEMPLATE/{bug,feature}.md` 与 `.github/PULL_REQUEST_TEMPLATE.md`
 
-**审计机制**：
-- 新增 `AUDIT_REPORT.md`，记录安全/权限/输入校验/前端安全/中文编码状态
+**仓库结构整理**：
+- `RELEASE_NOTES_*.md` 移至 `docs/release-notes/`
+- `SECURITY_AUDIT_v0.25.6.md` / `SECURITY_ROADMAP.md` 移至 `docs/security/`
+- `INSTALL_CHECKLIST.md` 移至 `docs/`
+- 删除 3 个 orphan `*.fpk.sha256` 文件，`.gitignore` 加 `*.sha256`
 
-**v0.30.2 功能回顾**（已合并）：
-- 新增 i18n、Provider Marketplace、Backup/Restore、OpenAPI 与移动端 ttyd 体验改进。
+**细节修正**：
+- `cmd/upgrade_init` 标记名 `.qwenpaw_keep_runtime` → `.hermes_keep_runtime`（语义对齐）
+
+### v0.30.7
+
+UI 修复：把 Dashboard 端口/访问模式控件从 StatusCard 内部抽到状态卡片下方独立 UCard，宽屏横排、移动端竖排，彻底解决 4 列网格里 details slot 文字塌缩成一字一行的问题。
+
+### v0.30.6
+
+状态总览端口/模式快速管理 + 修复 v0.30.5 端口不生效 bug：
+- 修复 `DASHBOARD_PORT` 模块加载时被冻结导致面板内改端口不生效，改为每次 `startDashboard()` 重读 `.env`
+- 新增 `/api/settings/dashboard-mode` 切换本地 / 外部访问
+- StatusCard 卡片新增"访问模式 USwitch"+ 端口编辑框，修改后自动重启 Dashboard 立即生效
+- StatusCard 组件支持 details slot 与 subtitle 共存
+
+### v0.30.5
+
+应用设置 WebUI 端口配置 + 治理收尾：
+- 新增 `/api/settings/dashboard-port`，应用设置页可直接修改 Dashboard 端口并自动重启
+- `build.sh` 自动同步 manifest 版本到 package.json，并在打包后自动计算 fpk SHA256 注入 manifest checksum
+- "打开 Dashboard" 按钮在非本地访问模式下显示 ⚠️ 红色"未加密"角标，配合 toast 风险提示
+
+### v0.30.4
+
+manifest 字段对齐 + 字段补齐：
+- 新增 `service_port=9119`、`disable_authorization_path=false`、`checksum`
+- 生命周期脚本补齐：`cmd/install_init` / `cmd/upgrade_init` / `cmd/config_callback`
+- 新增 `AUDIT_REPORT.md` 基础模板
 
 ### v0.27.0
 

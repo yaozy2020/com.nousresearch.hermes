@@ -33,18 +33,15 @@ CONFIG_DIR="${HERMES_DATA_DIR}/config"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 APP_ROOT="$(dirname "$SCRIPT_DIR")"
 APP_DIR="${TRIM_APPDEST:-${APP_ROOT}/app}"
-VERSION_FILE="${APP_ROOT}/config/hermes-version.env"
 SOUL_MD_SRC="${APP_ROOT}/config/prompts/SOUL.md"
 
-# 读取版本（优先从 hermes-version.env，回落到 manifest）
+# 读取版本：manifest 是 SSOT（v0.30.8 起统一），不再读取 hermes-version.env
 HERMES_VERSION=""
-if [ -f "${VERSION_FILE}" ]; then
-    . "${VERSION_FILE}"
-fi
-if [ -z "${HERMES_VERSION}" ] && [ -f "${APP_ROOT}/manifest" ]; then
+if [ -f "${APP_ROOT}/manifest" ]; then
     HERMES_VERSION=$(grep '^version' "${APP_ROOT}/manifest" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || true)
 fi
-HERMES_VERSION="${HERMES_VERSION:-0.30.3}"
+# 兜底使用 unknown 而非硬编码版本号，让漏读 manifest 的故障醒目
+HERMES_VERSION="${HERMES_VERSION:-unknown}"
 
 log_msg "=== Hermes install_callback started, version=${HERMES_VERSION} ==="
 

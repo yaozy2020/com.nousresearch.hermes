@@ -22,6 +22,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Setup Python (for governance scripts)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Preflight (version SSOT + repo hygiene)
+        run: |
+          chmod +x scripts/preflight.sh scripts/sync-version.py scripts/gen-audit.py
+          bash scripts/preflight.sh
+
       - name: Determine tag
         id: tag
         run: |
