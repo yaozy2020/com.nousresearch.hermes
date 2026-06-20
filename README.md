@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.30.6-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.6)
+[![Version](https://img.shields.io/badge/version-0.30.7-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.7)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 

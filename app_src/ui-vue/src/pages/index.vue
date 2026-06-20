@@ -440,55 +440,6 @@ onUnmounted(() => {
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running || !dashboard?.insecure" @click="openDashboard">打开</UButton>
         </template>
-        <template #details>
-          <!-- v0.30.6: 端口与访问模式快速管理（写 .env + 自动重启 Dashboard） -->
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 mt-3 border-t border-[var(--ui-border)]">
-            <div>
-              <div class="text-xs text-[var(--ui-text-muted)] mb-1">访问模式</div>
-              <div class="flex items-center gap-2">
-                <USwitch
-                  :model-value="dashboard?.insecure ?? false"
-                  :loading="modeSaving"
-                  :disabled="modeSaving"
-                  @update:model-value="(v: boolean) => applyMode(v)"
-                />
-                <span class="text-sm">
-                  {{ dashboard?.insecure ? '⚠ 局域网外部访问' : '🔒 仅本地（127.0.0.1）' }}
-                </span>
-              </div>
-              <div class="text-xs text-[var(--ui-text-muted)] mt-1">
-                打开开关 = 局域网可访问；关闭 = 仅本机
-              </div>
-            </div>
-            <div>
-              <div class="text-xs text-[var(--ui-text-muted)] mb-1">端口</div>
-              <div class="flex items-center gap-2">
-                <UInput
-                  v-model.number="portInput"
-                  type="number"
-                  :min="1024"
-                  :max="65535"
-                  size="sm"
-                  class="w-28"
-                  :placeholder="String(dashboard?.port || 9119)"
-                />
-                <UButton
-                  size="sm"
-                  color="primary"
-                  variant="outline"
-                  :loading="portSaving"
-                  :disabled="portSaving || portInput === null || portInput === dashboard?.port"
-                  @click="applyPort"
-                >
-                  应用
-                </UButton>
-              </div>
-              <div class="text-xs text-[var(--ui-text-muted)] mt-1">
-                修改后会自动重启 Dashboard
-              </div>
-            </div>
-          </div>
-        </template>
       </StatusCard>
 
       <StatusCard
@@ -504,6 +455,68 @@ onUnmounted(() => {
         </template>
       </StatusCard>
     </div>
+
+    <!-- v0.30.7: Dashboard 访问设置控制条（独立一行，宽屏横排，移动端竖排） -->
+    <UCard
+      v-if="dashboard"
+      class="bg-[var(--ui-bg-card)] shadow-sm"
+      :ui="{ root: 'ring-0 divide-y-0', body: 'p-4 sm:p-5' }"
+    >
+      <div class="flex flex-col gap-3 sm:gap-4 sm:flex-row sm:items-center sm:flex-wrap">
+        <div class="flex items-center gap-2 shrink-0">
+          <UIcon name="i-lucide-shield" class="w-5 h-5 text-primary" />
+          <span class="font-semibold text-[var(--ui-text)]">Dashboard 访问设置</span>
+        </div>
+        <div class="hidden sm:block flex-1" />
+
+        <!-- 访问模式 -->
+        <div class="flex items-center gap-3 flex-wrap">
+          <span class="text-sm text-[var(--ui-text-muted)] shrink-0">访问模式</span>
+          <USwitch
+            :model-value="dashboard.insecure ?? false"
+            :loading="modeSaving"
+            :disabled="modeSaving"
+            @update:model-value="(v: boolean) => applyMode(v)"
+          />
+          <UBadge
+            :color="dashboard.insecure ? 'error' : 'success'"
+            variant="soft"
+            size="sm"
+          >
+            {{ dashboard.insecure ? '⚠ 外部访问' : '🔒 仅本地' }}
+          </UBadge>
+        </div>
+
+        <div class="hidden sm:block w-px h-6 bg-[var(--ui-border)]" />
+
+        <!-- 端口 -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-sm text-[var(--ui-text-muted)] shrink-0">端口</span>
+          <UInput
+            v-model.number="portInput"
+            type="number"
+            :min="1024"
+            :max="65535"
+            size="sm"
+            class="w-28"
+            :placeholder="String(dashboard.port || 9119)"
+          />
+          <UButton
+            size="sm"
+            color="primary"
+            variant="outline"
+            :loading="portSaving"
+            :disabled="portSaving || portInput === null || portInput === dashboard.port"
+            @click="applyPort"
+          >
+            应用
+          </UButton>
+        </div>
+      </div>
+      <p class="text-xs text-[var(--ui-text-muted)] mt-3">
+        💡 修改任一项后 Dashboard 会自动重启，无需重启 fnOS 应用。「外部访问」会让局域网设备直连 <code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">http://nas:{{ dashboard.port || 9119 }}</code>，请仅在可信网络使用。
+      </p>
+    </UCard>
 
     <!-- 版本与日志 -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
