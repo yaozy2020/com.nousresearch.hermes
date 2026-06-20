@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { api } from '@/composables/useApi'
 import StatusCard from '@/components/StatusCard.vue'
 import type { HealthResponse, LogResponse } from '@/types/api'
@@ -213,6 +213,82 @@ async function lockDashboard() {
   }
 }
 
+// v0.30.6: Dashboard 端口与访问模式快速管理
+const portInput = ref<number | null>(null)
+const portSaving = ref(false)
+const modeSaving = ref(false)
+
+async function applyPort() {
+  const p = Number(portInput.value)
+  if (!Number.isInteger(p) || p < 1024 || p > 65535) {
+    showNotification('端口必须在 1024-65535 之间', 'error')
+    return
+  }
+  if (dashboard.value && p === dashboard.value.port) {
+    showNotification('端口未变化', 'info')
+    return
+  }
+  portSaving.value = true
+  try {
+    const r = await api<{ ok: boolean; port?: number; restarted?: boolean; restartError?: string; error?: string }>('api/settings/dashboard-port', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ port: p }),
+    })
+    if (!r.ok) {
+      showNotification(r.error || '保存失败', 'error')
+      return
+    }
+    if (r.restarted) {
+      showNotification(`端口已切换为 ${r.port}，Dashboard 已重启`, 'success')
+    } else if (r.restartError) {
+      showNotification(`端口已写入，但 Dashboard 重启失败：${r.restartError}`, 'warning')
+    } else {
+      showNotification(`端口已设为 ${r.port}（Dashboard 未运行，下次启动生效）`, 'success')
+    }
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('保存失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    portSaving.value = false
+    refreshOverview()
+  }
+}
+
+async function applyMode(insecure: boolean) {
+  modeSaving.value = true
+  try {
+    const r = await api<{ ok: boolean; insecure?: boolean; restarted?: boolean; restartError?: string; error?: string }>('api/settings/dashboard-mode', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ insecure }),
+    })
+    if (!r.ok) {
+      showNotification(r.error || '切换失败', 'error')
+      return
+    }
+    const label = r.insecure ? '外部访问' : '本地安全'
+    if (r.restarted) {
+      showNotification(`已切换到${label}模式，Dashboard 已重启`, 'success')
+    } else if (r.restartError) {
+      showNotification(`已切换到${label}模式，但 Dashboard 重启失败：${r.restartError}`, 'warning')
+    } else {
+      showNotification(`已切换到${label}模式（Dashboard 未运行，下次启动生效）`, 'success')
+    }
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('切换失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    modeSaving.value = false
+    refreshOverview()
+  }
+}
+
+// 监听 dashboard.port 变化，同步到 portInput（仅在用户未编辑时）
+watch(() => dashboard.value?.port, (p) => {
+  if (p && portInput.value === null) portInput.value = p
+})
+
 async function terminalAction(act: 'stop') {
   const label = act === 'stop' ? '停止' : '启动'
   showNotification(`终端正在${label}…`, 'info')
@@ -362,9 +438,56 @@ onUnmounted(() => {
         <template #actions>
           <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running" @click="dashboardAction('stop')">停止</UButton>
-          <UButton v-if="dashboard?.running && dashboard?.insecure" color="warning" variant="outline" size="sm" @click="lockDashboard">锁为本地</UButton>
-          <UButton v-else-if="dashboard?.running" color="neutral" variant="outline" size="sm" disabled title="Dashboard 已锁为仅本地访问；如需局域网打开，请在 .env 中删除 HERMES_DASHBOARD_INSECURE=0 或设为 1 并重启">本地模式</UButton>
           <UButton color="neutral" variant="outline" size="sm" :disabled="!dashboard?.running || !dashboard?.insecure" @click="openDashboard">打开</UButton>
+        </template>
+        <template #details>
+          <!-- v0.30.6: 端口与访问模式快速管理（写 .env + 自动重启 Dashboard） -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-3 mt-3 border-t border-[var(--ui-border)]">
+            <div>
+              <div class="text-xs text-[var(--ui-text-muted)] mb-1">访问模式</div>
+              <div class="flex items-center gap-2">
+                <USwitch
+                  :model-value="dashboard?.insecure ?? false"
+                  :loading="modeSaving"
+                  :disabled="modeSaving"
+                  @update:model-value="(v: boolean) => applyMode(v)"
+                />
+                <span class="text-sm">
+                  {{ dashboard?.insecure ? '⚠ 局域网外部访问' : '🔒 仅本地（127.0.0.1）' }}
+                </span>
+              </div>
+              <div class="text-xs text-[var(--ui-text-muted)] mt-1">
+                打开开关 = 局域网可访问；关闭 = 仅本机
+              </div>
+            </div>
+            <div>
+              <div class="text-xs text-[var(--ui-text-muted)] mb-1">端口</div>
+              <div class="flex items-center gap-2">
+                <UInput
+                  v-model.number="portInput"
+                  type="number"
+                  :min="1024"
+                  :max="65535"
+                  size="sm"
+                  class="w-28"
+                  :placeholder="String(dashboard?.port || 9119)"
+                />
+                <UButton
+                  size="sm"
+                  color="primary"
+                  variant="outline"
+                  :loading="portSaving"
+                  :disabled="portSaving || portInput === null || portInput === dashboard?.port"
+                  @click="applyPort"
+                >
+                  应用
+                </UButton>
+              </div>
+              <div class="text-xs text-[var(--ui-text-muted)] mt-1">
+                修改后会自动重启 Dashboard
+              </div>
+            </div>
+          </div>
         </template>
       </StatusCard>
 

@@ -27,7 +27,8 @@ import { isSafeWriteRequest, isSafeReadRequest } from "./modules/security.js";
 import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
-  installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec, initHermesModule
+  installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec, initHermesModule,
+  getDashboardPort, getDashboardInsecure
 } from "./modules/hermes.js";
 import { isTtydAlive, getTtydPid, getTtydPort, getTtydUptime, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
@@ -39,7 +40,7 @@ const STATIC_DIR = process.env.STATIC_DIR || "./ui";
 const SOCKET_PATH = process.env.SOCKET_PATH || "/tmp/hermes.sock";
 const VENV_DIR = process.env.HERMES_VENV || `${DATA_DIR}/venv`;
 const HERMES_BIN = process.env.HERMES_BIN || `${VENV_DIR}/bin/hermes`;
-const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
+const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119"); // initial 兜底; 实际显示用 getDashboardPort()
 const BIN_DIR = process.env.HERMES_PANEL_BIN || (process.env.TRIM_APPDEST ? `${process.env.TRIM_APPDEST}/bin` : "./bin");
 const TTYD_BIN = `${BIN_DIR}/ttyd`;
 
@@ -243,7 +244,7 @@ async function handleRequest(req) {
       try {
         const running = isDashboardRunning();
         push("dashboard", t("diag.dashboard"), running ? "ok" : "warn",
-          running ? t("diag.running_with_pid_port", { pid: getDashboardPid(), port: DASHBOARD_PORT })
+          running ? t("diag.running_with_pid_port", { pid: getDashboardPid(), port: getDashboardPort() })
                   : t("diag.not_started"));
       } catch (e) { push("dashboard", t("diag.dashboard"), "error", String(e)); }
 
@@ -323,12 +324,12 @@ async function handleRequest(req) {
         dashboardRunning: isDashboardRunning(),
         dashboardPid: getDashboardPid(),
         dashboardUptime: getDashboardUptime(),
-        dashboardPort: DASHBOARD_PORT,
+        dashboardPort: getDashboardPort(),
         ttydRunning: isTtydAlive(),
         ttydPid: getTtydPid(),
         ttydUptime: getTtydUptime(),
         ttydPort: getTtydPort(),
-        dashboardInsecure: process.env.HERMES_DASHBOARD_INSECURE !== "0",
+        dashboardInsecure: getDashboardInsecure(),
         version: await getVersion()
       });
     }
@@ -404,7 +405,7 @@ async function handleRequest(req) {
       return json(result, result.ok ? 200 : 500);
     }
     if (pathname === "/api/dashboard/status" && method === "GET") {
-      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: DASHBOARD_PORT, insecure: process.env.HERMES_DASHBOARD_INSECURE !== "0" });
+      return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: getDashboardPort(), insecure: getDashboardInsecure() });
     }
     if (pathname === "/api/dashboard/start" && method === "POST") {
       const result = await startDashboard();
@@ -426,7 +427,7 @@ async function handleRequest(req) {
     }
     // v0.30.5: 应用设置 — 单独修改 Dashboard 端口（不需要重装）
     if (pathname === "/api/settings/dashboard-port" && method === "GET") {
-      return json({ ok: true, port: DASHBOARD_PORT });
+      return json({ ok: true, port: getDashboardPort() });
     }
     if (pathname === "/api/settings/dashboard-port" && method === "POST") {
       const body = await safeParseBody(req);
@@ -437,9 +438,46 @@ async function handleRequest(req) {
       }
       const result = setEnvKey("HERMES_DASHBOARD_PORT", String(port));
       if (!result.ok) return json(result, 400);
-      // 提示：fnOS service 进程启动时已注入 env，单独写 .env 不影响当前进程；
-      // 真正生效需要 fnOS 应用重启。这里仅返回 needsAppRestart 标志让前端给出明确提示。
-      return json({ ok: true, port, needsAppRestart: true });
+      // v0.30.6: 写完 .env 立即重启 Dashboard 让新端口生效；fnOS 主面板进程不需要重启
+      let restarted = false;
+      let restartError = null;
+      if (isDashboardRunning()) {
+        try {
+          await stopDashboard();
+          await new Promise((r) => setTimeout(r, 1500));
+          const r = await startDashboard();
+          restarted = !!r.ok;
+          if (!r.ok) restartError = r.error || "restart failed";
+        } catch (err) {
+          restartError = String(err && err.message || err);
+        }
+      }
+      return json({ ok: true, port, restarted, restartError });
+    }
+    // v0.30.6: Dashboard 访问模式（本地/外部）开关，写 .env 后自动重启 Dashboard
+    if (pathname === "/api/settings/dashboard-mode" && method === "GET") {
+      return json({ ok: true, insecure: getDashboardInsecure(), port: getDashboardPort() });
+    }
+    if (pathname === "/api/settings/dashboard-mode" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const insecure = !!(body && body.insecure);
+      const result = setEnvKey("HERMES_DASHBOARD_INSECURE", insecure ? "1" : "0");
+      if (!result.ok) return json(result, 400);
+      let restarted = false;
+      let restartError = null;
+      if (isDashboardRunning()) {
+        try {
+          await stopDashboard();
+          await new Promise((r) => setTimeout(r, 1500));
+          const r = await startDashboard();
+          restarted = !!r.ok;
+          if (!r.ok) restartError = r.error || "restart failed";
+        } catch (err) {
+          restartError = String(err && err.message || err);
+        }
+      }
+      return json({ ok: true, insecure, restarted, restartError });
     }
     if (pathname === "/api/hermes/restart" && method === "POST") {
       const result = await restartHermesAll();

@@ -12,7 +12,55 @@ const LOG_DIR = `${DATA_DIR}/logs`;
 const RUNTIME_DIR = `${DATA_DIR}/runtime`;
 const PID_FILE = `${RUNTIME_DIR}/gateway.pid`;
 const DASHBOARD_PID_FILE = `${RUNTIME_DIR}/dashboard.pid`;
-const DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
+const HERMES_HOME = process.env.HERMES_HOME || `${DATA_DIR}/home`;
+const ENV_FILE = `${HERMES_HOME}/.env`;
+
+// v0.30.6: 启动时的初始端口仅用于尚无 .env 时的兜底。
+// 真正生效的端口/模式由 readDashboardEnv() 在每次启动 Dashboard 前重新读 .env 决定，
+// 这样面板内修改端口/访问模式后只需重启 Dashboard，不必重启整个应用。
+const INITIAL_DASHBOARD_PORT = parseInt(process.env.HERMES_DASHBOARD_PORT || "9119");
+
+function readDashboardEnv() {
+  let port = INITIAL_DASHBOARD_PORT;
+  let insecure = process.env.HERMES_DASHBOARD_INSECURE !== "0";
+  if (existsSync(ENV_FILE)) {
+    try {
+      const text = readFileSync(ENV_FILE, "utf-8");
+      for (const raw of text.split(/\r?\n/)) {
+        const line = raw.trim();
+        if (!line || line.startsWith("#")) continue;
+        const eq = line.indexOf("=");
+        if (eq < 1) continue;
+        const k = line.slice(0, eq).trim();
+        const v = line.slice(eq + 1).trim();
+        if (k === "HERMES_DASHBOARD_PORT") {
+          const p = parseInt(v);
+          if (Number.isInteger(p) && p >= 1024 && p <= 65535) port = p;
+        } else if (k === "HERMES_DASHBOARD_INSECURE") {
+          insecure = v !== "0";
+        }
+      }
+    } catch (err) {
+      swallowError("read .env for dashboard", err);
+    }
+  }
+  return { port, insecure };
+}
+
+// 兼容旧导出：返回当前文件里读取的端口；调用方期望它是常量数字时仍可工作。
+let DASHBOARD_PORT = INITIAL_DASHBOARD_PORT;
+try {
+  DASHBOARD_PORT = readDashboardEnv().port;
+} catch {}
+
+// v0.30.6: 给 index.js 用的动态端口/模式 getter，每次都读 .env 而不是缓存值
+export function getDashboardPort() {
+  try { return readDashboardEnv().port; } catch { return DASHBOARD_PORT; }
+}
+export function getDashboardInsecure() {
+  try { return readDashboardEnv().insecure; } catch { return process.env.HERMES_DASHBOARD_INSECURE !== "0"; }
+}
+
 
 for (const d of [LOG_DIR, RUNTIME_DIR]) {
   // 模块顶层 mkdir 是历史遗留：测试导入此模块时也会触发，
@@ -255,22 +303,27 @@ export function getDashboardPid() {
 }
 
 export async function startDashboard() {
-  if (isDashboardRunning()) return { ok: true, message: "already running", pid: getDashboardPid(), port: DASHBOARD_PORT };
+  // v0.30.6: 每次启动前从 .env 重新读取端口和访问模式，让面板内修改即时生效
+  const { port, insecure } = readDashboardEnv();
+  DASHBOARD_PORT = port;
+  if (isDashboardRunning()) return { ok: true, message: "already running", pid: getDashboardPid(), port };
   if (!existsSync(HERMES_BIN)) return { ok: false, error: "hermes not installed yet" };
 
   const env = {
     ...process.env,
+    HERMES_DASHBOARD_PORT: String(port),
+    HERMES_DASHBOARD_INSECURE: insecure ? "1" : "0",
     HERMES_HOME: `${DATA_DIR}/home`,
     HOME: `${DATA_DIR}/home`
   };
   // 部署在 NAS 等家庭内网场景下，默认允许局域网直接访问 Dashboard；
-  // 如需锁回仅本地访问，设置 HERMES_DASHBOARD_INSECURE=0 并重启。
-  const dashboardInsecure = process.env.HERMES_DASHBOARD_INSECURE !== "0";
+  // 如需锁回仅本地访问，设置 HERMES_DASHBOARD_INSECURE=0。
+  const dashboardInsecure = insecure;
   const dashboardHost = process.env.HERMES_DASHBOARD_HOST || (dashboardInsecure ? "0.0.0.0" : "127.0.0.1");
-  if (await isPortInUse(DASHBOARD_PORT, dashboardHost)) {
-    return { ok: false, error: `端口 ${DASHBOARD_PORT} 已被占用，请修改 HERMES_DASHBOARD_PORT 后重试` };
+  if (await isPortInUse(port, dashboardHost)) {
+    return { ok: false, error: `端口 ${port} 已被占用，请修改 HERMES_DASHBOARD_PORT 后重试` };
   }
-  const dashboardArgs = [HERMES_BIN, "dashboard", "--host", dashboardHost, "--port", String(DASHBOARD_PORT), "--skip-build", "--no-open"];
+  const dashboardArgs = [HERMES_BIN, "dashboard", "--host", dashboardHost, "--port", String(port), "--skip-build", "--no-open"];
   if (dashboardInsecure) {
     dashboardArgs.push("--insecure");
   }
