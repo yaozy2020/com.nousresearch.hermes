@@ -1,6 +1,17 @@
 // @bun
 // CSRF / 来源校验工具
 
+function getClientIp(req) {
+  const xff = req.headers.get("x-forwarded-for") || "";
+  if (xff) {
+    const first = xff.split(",")[0].trim();
+    if (first) return first;
+  }
+  const real = req.headers.get("x-real-ip");
+  if (real) return real.trim();
+  return "unknown";
+}
+
 function bareHost(host) {
   if (!host) return "";
   return host.toLowerCase().split(":")[0];
@@ -108,8 +119,12 @@ export function isSafeWriteRequest(req) {
     if (ok === false) return false;
   }
 
-  // 既无 Origin 也无 Referer：视为直接请求 / 脚本调用，放行
-  return true;
+  // 既无 Origin 也无 Referer：仅允许本地/内网 IP，或带 API Token 的受信请求
+  // 防止 curl/脚本直接调用 POST API 绕过 CSRF 保护
+  const clientIp = getClientIp(req);
+  if (isPrivateHost(clientIp)) return true;
+  if (req.headers.get("authorization") || req.headers.get("x-hermes-token")) return true;
+  return false;
 }
 
 // 用于需要额外 framing 保护的读端点（如 /ttyd*）
@@ -128,6 +143,10 @@ export function isSafeReadRequest(req) {
     return checkHeader(referer, expectedHosts) === true;
   }
 
-  // 没有来源头时，允许直接访问（如用户手动打开链接）
-  return true;
+  // 没有来源头时：仅允许本地/内网 IP 直接访问（如用户手动打开链接）
+  // 外部脚本直接访问需带 API Token
+  const clientIp = getClientIp(req);
+  if (isPrivateHost(clientIp)) return true;
+  if (req.headers.get("authorization") || req.headers.get("x-hermes-token")) return true;
+  return false;
 }

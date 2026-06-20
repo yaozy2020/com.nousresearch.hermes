@@ -5,8 +5,8 @@
 
 ## 当前版本：v0.31.1
 
-- **生成时间**：2026-06-20 19:47:56 +0800
-- **测试用例**：133 个 / 16 个文件
+- **生成时间**：2026-06-20 20:07:55 +0800
+- **测试用例**：136 个 / 16 个文件
 - **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
 - **后端模块**：17 个
 - **CI Workflow**：ci.yml, release.yml
@@ -37,8 +37,8 @@
 | `logger.js` | 151 |
 | `openapi.js` | 110 |
 | `providers.js` | 92 |
-| `rate-limit.js` | 108 |
-| `security.js` | 133 |
+| `rate-limit.js` | 179 |
+| `security.js` | 152 |
 | `static.js` | 86 |
 | `terminal-shell.js` | 101 |
 | `terminal.js` | 256 |
@@ -68,13 +68,11 @@
 | `v0.31.0` | 2026-06-20 |
 | `v0.30.8` | 2026-06-20 |
 | `v0.30.7` | 2026-06-20 |
+| `v0.30.6` | 2026-06-20 |
 
 ## 待持续推进项
 
-- ⏳ 面板可选 token 鉴权（默认关闭，env 开启）— P2
-- ⏳ `/api/*` rate limit 令牌桶 — P2
-- ⏳ `hermes.js` 单文件 ~487 行拆分 — P3
-- ⏳ `CONTRIBUTING.md` 与 `CHANGELOG.md` 标准化 — P3
+（无待持续推进项）
 
 ---
 

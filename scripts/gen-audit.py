@@ -58,6 +58,58 @@ def list_workflows() -> list[str]:
     return sorted(p.name for p in d.glob("*.yml"))
 
 
+def read_changelog() -> str:
+    """从 manifest 读取 changelog 字段。"""
+    for line in (ROOT / "manifest").read_text(encoding="utf-8").splitlines():
+        if line.strip().startswith("changelog"):
+            return line.split("=", 1)[1].strip()
+    return ""
+
+
+def filter_pending_items(pending: list[str], changelog: str) -> list[str]:
+    """根据 changelog 过滤已完成项（动态解析版本特性）。"""
+    if not changelog:
+        return pending
+    # 将 HTML <br/> 替换为换行，方便逐行匹配
+    text = changelog.replace("<br/>", "\n").lower()
+    # 提取每个版本的特性关键词（v0.XX.Y 后的数字列表）
+    # 例如："v0.31.0（API 鉴权 + Rate limit）：1) 新增 API token 鉴权..."
+    version_features = []
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        # 匹配版本行（v0.31.0 ...）后的编号列表项
+        if re.match(r"^\d+\)", line):
+            version_features.append(line)
+        # 也匹配版本标题行中的关键词
+        elif "v0." in line and "：" in line:
+            version_features.append(line)
+    
+    # 合并所有特性文本
+    all_features = " ".join(version_features)
+    
+    # 定义 pending item 的识别特征（用于模糊匹配）
+    item_signatures = {
+        "token 鉴权": ["api token 鉴权", "token 鉴权", "hermes_api_token", "鉴权"],
+        "rate limit": ["rate limit", "令牌桶", "限流", "限流"],
+        "hermes.js": ["hermes.js 拆分", "hermes/ 子目录", "单文件", "hermes.js"],
+        "contributing": ["contributing", "changelog 标准化", "标准化"],
+    }
+    
+    completed = []
+    for item in pending:
+        item_lower = item.lower()
+        for sig_key, sigs in item_signatures.items():
+            if sig_key in item_lower:
+                # 检查 changelog 特性文本中是否出现任一标记
+                if any(sig in all_features for sig in sigs):
+                    completed.append(item)
+                    break
+    
+    return [item for item in pending if item not in completed]
+
+
 def recent_tags(n: int = 5) -> list[tuple[str, str]]:
     """读取最近 n 个 git tag。CI 模式下默认禁用以避免非确定性。"""
     import os
@@ -162,10 +214,19 @@ def render() -> str:
     a("")
     a("## 待持续推进项")
     a("")
-    a("- ⏳ 面板可选 token 鉴权（默认关闭，env 开启）— P2")
-    a("- ⏳ `/api/*` rate limit 令牌桶 — P2")
-    a("- ⏳ `hermes.js` 单文件 ~487 行拆分 — P3")
-    a("- ⏳ `CONTRIBUTING.md` 与 `CHANGELOG.md` 标准化 — P3")
+    pending = [
+        "⏳ 面板可选 token 鉴权（默认关闭，env 开启）— P2",
+        "⏳ `/api/*` rate limit 令牌桶 — P2",
+        "⏳ `hermes.js` 单文件 ~487 行拆分 — P3",
+        "⏳ `CONTRIBUTING.md` 与 `CHANGELOG.md` 标准化 — P3",
+    ]
+    changelog = read_changelog()
+    pending = filter_pending_items(pending, changelog)
+    if pending:
+        for item in pending:
+            a(f"- {item}")
+    else:
+        a("（无待持续推进项）")
     a("")
     a("---")
     a("")
