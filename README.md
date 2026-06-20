@@ -112,7 +112,7 @@ bash build.sh
 
 ### v0.30.2（当前版本）
 
-多模块合并发版，包含 i18n、Provider Marketplace、Backup/Restore、OpenAPI、移动端 ttyd 体验改进。
+新增 i18n、Provider Marketplace、Backup/Restore、OpenAPI 与移动端 ttyd 体验改进。
 
 **后端新增 API**：
 - `/api/providers/user` — 自定义 Provider 管理层，叠加在内置 11 个预设之上
