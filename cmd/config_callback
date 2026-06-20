@@ -1,2 +1,34 @@
 #!/bin/bash
-exit 0
+
+### config_callback — 配置变更后重启 Hermes 控制面板
+### 复用 cmd/main restart 逻辑，确保用户保存配置后立即生效
+
+LOG_FILE="${TRIM_PKGVAR}/hermes-configure.log"
+
+log_msg() {
+    echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
+}
+
+log_msg "config_callback: configuration changed, restarting ..."
+
+# 找到 cmd/main 绝对路径
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(dirname "$SCRIPT_DIR")"
+MAIN="${APP_ROOT}/cmd/main"
+
+if [ ! -x "${MAIN}" ]; then
+    log_msg "main script not found: ${MAIN}"
+    exit 1
+fi
+
+# 复用 main restart（会 TERM → 等 10s → KILL → start）
+"${MAIN}" restart >> "${LOG_FILE}" 2>&1
+result=$?
+
+if [ $result -eq 0 ]; then
+    log_msg "restart success"
+else
+    log_msg "restart failed, exit=${result}"
+fi
+
+exit $result
