@@ -67,5 +67,19 @@ for old_log in "${LOG_DIR}/gateway.log" "${LOG_DIR}/dashboard.log"; do
   fi
 done
 
+# 4) 调用 install_init / upgrade_init 做环境检查（如果存在）
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(dirname "$SCRIPT_DIR")"
+
+if [ -f "${SCRIPT_DIR}/install_init" ]; then
+    log "running install_init ..."
+    bash "${SCRIPT_DIR}/install_init" 2>&1 | while read -r line; do log "install_init: ${line}"; done || true
+fi
+
+if [ -f "${SCRIPT_DIR}/upgrade_init" ]; then
+    log "running upgrade_init ..."
+    bash "${SCRIPT_DIR}/upgrade_init" 2>&1 | while read -r line; do log "upgrade_init: ${line}"; done || true
+fi
+
 log "=== upgrade_callback completed ==="
 exit 0

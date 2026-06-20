@@ -36,12 +36,15 @@ APP_DIR="${TRIM_APPDEST:-${APP_ROOT}/app}"
 VERSION_FILE="${APP_ROOT}/config/hermes-version.env"
 SOUL_MD_SRC="${APP_ROOT}/config/prompts/SOUL.md"
 
-# 读取版本
-HERMES_VERSION="0.16.2"
+# 读取版本（优先从 hermes-version.env，回落到 manifest）
+HERMES_VERSION=""
 if [ -f "${VERSION_FILE}" ]; then
     . "${VERSION_FILE}"
-    HERMES_VERSION="${HERMES_VERSION:-0.16.2}"
 fi
+if [ -z "${HERMES_VERSION}" ] && [ -f "${APP_ROOT}/manifest" ]; then
+    HERMES_VERSION=$(grep '^version' "${APP_ROOT}/manifest" 2>/dev/null | awk -F'=' '{print $2}' | tr -d ' ' || true)
+fi
+HERMES_VERSION="${HERMES_VERSION:-0.30.3}"
 
 log_msg "=== Hermes install_callback started, version=${HERMES_VERSION} ==="
 

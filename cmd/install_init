@@ -9,6 +9,9 @@ log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> "${LOG_FILE}"
 }
 
+# 确保日志目录存在
+mkdir -p "$(dirname "${LOG_FILE}")" 2>/dev/null || true
+
 log_msg "=== install_init started ==="
 
 # 检查 Bun
