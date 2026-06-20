@@ -24,6 +24,8 @@ import { serveStatic } from "./modules/static.js";
 import { getVersion } from "./modules/version.js";
 import { errorResponse } from "./modules/error.js";
 import { isSafeWriteRequest, isSafeReadRequest } from "./modules/security.js";
+import { isAuthEnabled, verifyRequest, enableAuth, disableAuth, resetToken, checkResetMarker } from "./modules/auth.js";
+import { checkGeneralLimit, isAuthLocked, recordAuthFailure, recordAuthSuccess } from "./modules/rate-limit.js";
 import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
@@ -132,6 +134,68 @@ async function handleRequest(req) {
   if (pathname.startsWith("/api/")) {
     if (!isSafeWriteRequest(req)) {
       return errorResponse("Forbidden: untrusted origin", "FORBIDDEN_ORIGIN", 403);
+    }
+
+    // v0.31: 通用限流（每 IP 300/min）
+    const limited = checkGeneralLimit(req);
+    if (limited) return limited;
+
+    // v0.31: API token 鉴权（默认关闭，HERMES_API_TOKEN 设置后启用）
+    // 白名单：/api/auth/status 和 /api/health 不需鉴权（前端探测用）
+    const isAuthExempt =
+      pathname === "/api/auth/status" ||
+      pathname === "/api/health" ||
+      // /api/auth/verify 是 token 验证端点，自身要走 verifyRequest 但不走 lock 逻辑
+      pathname === "/api/auth/verify";
+    if (!isAuthExempt && isAuthEnabled()) {
+      if (isAuthLocked(req)) {
+        return errorResponse("Too many failed attempts, locked 15min", "AUTH_LOCKED", 429);
+      }
+      if (!verifyRequest(req)) {
+        recordAuthFailure(req);
+        return errorResponse("Authentication required", "UNAUTHORIZED", 401);
+      }
+      recordAuthSuccess(req);
+    }
+
+    // ========== /api/auth/* 鉴权管理端点 ==========
+    if (pathname === "/api/auth/status" && method === "GET") {
+      return json({ ok: true, enabled: isAuthEnabled() });
+    }
+    if (pathname === "/api/auth/verify" && method === "POST") {
+      // 用于前端「测试 token」按钮
+      if (!isAuthEnabled()) return json({ ok: true, valid: true, enabled: false });
+      const valid = verifyRequest(req);
+      if (!valid) {
+        recordAuthFailure(req);
+        return json({ ok: false, valid: false, enabled: true }, 401);
+      }
+      recordAuthSuccess(req);
+      return json({ ok: true, valid: true, enabled: true });
+    }
+    if (pathname === "/api/auth/enable" && method === "POST") {
+      // 启用鉴权 — 必须当前未启用，避免被恶意覆盖现有 token
+      if (isAuthEnabled()) {
+        return errorResponse("Auth already enabled, use /reset to rotate", "AUTH_ALREADY_ENABLED", 400);
+      }
+      const { plain } = enableAuth();
+      log("info", "API auth enabled");
+      return json({ ok: true, token: plain, message: "Token shown ONCE — copy it now." });
+    }
+    if (pathname === "/api/auth/disable" && method === "POST") {
+      // 关闭鉴权（已通过 verifyRequest 校验）
+      disableAuth();
+      log("info", "API auth disabled");
+      return json({ ok: true });
+    }
+    if (pathname === "/api/auth/reset" && method === "POST") {
+      // 重置 token（已通过 verifyRequest 校验）— 仍要求当前已启用
+      if (!isAuthEnabled()) {
+        return errorResponse("Auth not enabled", "AUTH_NOT_ENABLED", 400);
+      }
+      const { plain } = resetToken();
+      log("info", "API auth token rotated");
+      return json({ ok: true, token: plain, message: "Token rotated — copy the new one now." });
     }
 
     if (pathname === "/api/providers/presets" && method === "GET") {
@@ -583,6 +647,11 @@ async function handleRequest(req) {
 // 启动前显式初始化关键模块（避免依赖模块顶层副作用）
 initConfigModule();
 initHermesModule();
+
+// v0.31: 启动时检测 .reset_token 兜底标记 — 文件存在则清空 API token + 删标记
+if (checkResetMarker()) {
+  log("warn", "API auth was reset by .reset_token marker file");
+}
 
 const server = Bun.serve({
   unix: SOCKET_PATH,

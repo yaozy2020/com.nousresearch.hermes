@@ -168,8 +168,31 @@ restart)
     sleep 1
     start_process
     ;;
+reset-token)
+    # v0.31: 应急通道 — 清空 API token，恢复鉴权关闭状态
+    # 用于忘记 token 后通过 SSH 恢复访问
+    ENV_FILE="${HERMES_HOME}/.env"
+    if [ -f "${ENV_FILE}" ]; then
+        # 删掉 HERMES_API_TOKEN 行（兼容空格 / 引号 / 注释外）
+        sed -i '/^[[:space:]]*HERMES_API_TOKEN[[:space:]]*=/d' "${ENV_FILE}" 2>/dev/null
+        log_msg "API token reset via cmd/main reset-token"
+        echo "API token cleared from ${ENV_FILE}"
+    else
+        echo "No .env file found at ${ENV_FILE}, nothing to reset"
+    fi
+    # 重启使配置生效
+    if status; then
+        echo "Restarting to apply changes ..."
+        stop_process
+        sleep 1
+        start_process
+        echo "Done. Auth is now disabled."
+    else
+        echo "Service not running, no restart needed."
+    fi
+    ;;
 *)
-    echo "Usage: $0 {start|stop|status|restart}"
+    echo "Usage: $0 {start|stop|status|restart|reset-token}"
     exit 1
     ;;
 esac

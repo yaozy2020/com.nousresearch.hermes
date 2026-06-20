@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.30.8-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.8)
+[![Version](https://img.shields.io/badge/version-0.31.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.31.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,37 @@ bash build.sh
 
 ## 版本历史
 
-### v0.30.8（当前版本）
+### v0.31.0（当前版本）
+
+API token 鉴权 + rate limit + GitHub fallback 默认禁用。
+
+**API token 鉴权（默认关闭）**：
+- `app_src/server/modules/auth.js` — SHA-256 哈希 + 恒等时间比较，token 仅显示一次
+- 启用方式：「关于」页 →「API 鉴权」→ 启用 → 生成 64 字符随机 token，自动写入 `${HERMES_HOME}/.env` 的 `HERMES_API_TOKEN` 字段
+- 客户端通过 `Authorization: Bearer <token>` 或 `X-Hermes-Token: <token>` 携带
+- 三种忘记 token 的恢复方式：
+  1. **应用内重置**：「API 鉴权」面板「重置 Token」按钮
+  2. **SSH 命令**：`/vol2/@apphome/com.nousresearch.hermes/cmd/main reset-token`
+  3. **兜底文件标记**：在 `${HERMES_HOME}/.reset_token` 创建空文件，下次启动自动清空 token
+
+**Rate limit**：
+- `app_src/server/modules/rate-limit.js` — 基于 IP 的内存令牌桶
+- 通用 API：每 IP 300/min（429 响应）
+- 鉴权失败专项：连续 5 次失败 → 该 IP 锁 15 分钟
+
+**安全收敛**：
+- `HERMES_NO_FALLBACK` 默认行为反转：现在**默认禁用** GitHub fallback，需 `HERMES_ALLOW_GH_FALLBACK=1` 显式启用
+- 旧 `HERMES_NO_FALLBACK=1` 仍兼容（且优先生效），向后兼容
+
+**前端**：
+- `useApi.ts` 新增 `getApiToken/setApiToken/clearApiToken`，自动注入 `Authorization: Bearer`，401 时自动清缓存
+- 「关于」页新增「API 鉴权」UCard：状态徽标 / 启用按钮 / 重置 / 关闭 / Token 显示与复制 / 手动配置 / 折叠的「忘记 token 怎么办」3 步说明
+
+**测试**：
+- 新增 `tests/auth.test.js`（13 用例）+ `tests/rate-limit.test.js`（7 用例）
+- 总测试 103/103 通过
+
+### v0.30.8
 
 版本治理 / 仓库结构整理 / 文档自动化。
 

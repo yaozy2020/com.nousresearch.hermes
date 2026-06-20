@@ -446,15 +446,18 @@ export async function installHermes(packageSpec) {
     })();
     const exitCode = await installProc.exited;
     if (exitCode !== 0) {
-      // 显式 fallback：默认从 PyPI 失败后回退 GitHub 官方源；
-      // 用户可设 HERMES_NO_FALLBACK=1 关闭，避免在限网环境下意外外联。
-      if (process.env.HERMES_NO_FALLBACK === "1") {
-        broadcastLog(`[install] ❌ pip install failed (exit ${exitCode}). HERMES_NO_FALLBACK=1, GitHub fallback disabled.\n`);
+      // v0.31: 默认禁用 GitHub fallback（更安全），需 HERMES_ALLOW_GH_FALLBACK=1 显式开启。
+      // 旧 HERMES_NO_FALLBACK=1 仍兼容（且优先生效）。
+      const noFallback =
+        process.env.HERMES_NO_FALLBACK === "1" ||
+        process.env.HERMES_ALLOW_GH_FALLBACK !== "1";
+      if (noFallback) {
+        broadcastLog(`[install] ❌ pip install failed (exit ${exitCode}). GitHub fallback disabled (set HERMES_ALLOW_GH_FALLBACK=1 to enable).\n`);
         installInProgress = false;
-        return { ok: false, error: `pip install failed (exit ${exitCode}). Fallback disabled by HERMES_NO_FALLBACK=1.` };
+        return { ok: false, error: `pip install failed (exit ${exitCode}). Fallback disabled.` };
       }
       broadcastLog(`[install] ⚠️ pip install failed (exit ${exitCode}). Falling back to GitHub: ${OFFICIAL_GIT_SPEC}\n`);
-      broadcastLog(`[install]    To disable this fallback, set HERMES_NO_FALLBACK=1 in .env.\n`);
+      broadcastLog(`[install]    HERMES_ALLOW_GH_FALLBACK=1 detected; allowing fallback this run.\n`);
       const ghProc = Bun.spawn([pip, "install", OFFICIAL_GIT_SPEC, "-q"], { stdout: "pipe", stderr: "pipe" });
       const ghExit = await ghProc.exited;
       if (ghExit !== 0) { installInProgress = false; return { ok: false, error: `pip install failed (exit ${exitCode}, github ${ghExit})` }; }
