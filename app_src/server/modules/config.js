@@ -221,3 +221,31 @@ export function deleteChannel(name) {
   try { chmodSync(envPath, 0o640); } catch {}
   return { ok: true, channel: name };
 }
+
+// v0.30.5: 单字段安全写入 .env。供应用设置页修改 HERMES_DASHBOARD_PORT 等使用。
+// 不会删除/重排已有键，只 upsert 一个键值对。
+export function setEnvKey(key, value) {
+  if (!key || typeof key !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(key)) {
+    return { ok: false, error: `invalid env key: ${key}` };
+  }
+  const envPath = `${CONFIG_DIR}/.env`;
+  const text = existsSync(envPath) ? readFileSync(envPath, "utf-8") : "";
+  const lines = text.split(/\r?\n/);
+  let found = false;
+  const out = lines.map((raw) => {
+    const eq = raw.indexOf("=");
+    if (eq < 1) return raw;
+    const k = raw.slice(0, eq).trim();
+    if (k !== key) return raw;
+    found = true;
+    return `${key}=${value}`;
+  });
+  if (!found) {
+    // 去掉末尾空行后追加
+    while (out.length && out[out.length - 1].trim() === "") out.pop();
+    out.push(`${key}=${value}`);
+  }
+  writeFileSync(envPath, out.join("\n") + (out.length && out[out.length - 1] !== "" ? "\n" : ""));
+  try { chmodSync(envPath, 0o640); } catch {}
+  return { ok: true, key, value: String(value) };
+}

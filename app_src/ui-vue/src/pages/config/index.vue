@@ -19,6 +19,56 @@ const env = ref('')
 const loading = ref(false)
 const saved = ref(false)
 
+// v0.30.5: Dashboard 端口设置
+const dashboardPort = ref<number>(9119)
+const dashboardPortInput = ref<number | null>(null)
+const portSaving = ref(false)
+
+async function loadDashboardPort() {
+  try {
+    const r = await api<{ ok: boolean; port: number }>('api/settings/dashboard-port')
+    if (r && r.ok) {
+      dashboardPort.value = r.port
+      dashboardPortInput.value = r.port
+    }
+  } catch {
+    // 忽略，沿用默认 9119
+  }
+}
+
+async function saveDashboardPort() {
+  const p = Number(dashboardPortInput.value)
+  if (!Number.isInteger(p) || p < 1024 || p > 65535) {
+    notify('端口必须在 1024-65535 之间', 'error')
+    return
+  }
+  if (p === dashboardPort.value) {
+    notify('端口未变化', 'info')
+    return
+  }
+  portSaving.value = true
+  try {
+    const r = await api<{ ok: boolean; error?: string; port?: number; needsAppRestart?: boolean }>('api/settings/dashboard-port', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ port: p }),
+    })
+    if (r.ok) {
+      dashboardPort.value = r.port || p
+      notify(r.needsAppRestart
+        ? `端口已写入 .env (${p})，请到 fnOS 应用中心重启 Hermes 让新端口生效`
+        : `端口已更新为 ${p}`, 'success')
+    } else {
+      notify(r.error || '保存失败', 'error')
+    }
+  } catch (e: unknown) {
+    const err = e as Error
+    notify('保存失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    portSaving.value = false
+  }
+}
+
 async function loadConfig() {
   loading.value = true
   try {
@@ -86,7 +136,10 @@ async function openDashboard() {
   }
 }
 
-onMounted(loadConfig)
+onMounted(async () => {
+  await loadConfig()
+  await loadDashboardPort()
+})
 </script>
 
 <template>
@@ -102,6 +155,30 @@ onMounted(loadConfig)
         <UButton color="primary" size="sm" @click="openDashboard">打开 Dashboard</UButton>
       </template>
     </UAlert>
+
+    <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+      <template #header>
+        <div class="flex items-center gap-2">
+          <UIcon name="i-lucide-network" class="w-5 h-5 text-primary" />
+          <span class="font-semibold text-[var(--ui-text)]">Dashboard 端口</span>
+        </div>
+      </template>
+      <div class="space-y-3">
+        <p class="text-sm text-[var(--ui-text-muted)]">
+          当前端口：<code class="font-mono bg-[var(--ui-bg-elevated)] px-1 rounded">{{ dashboardPort }}</code>。
+          修改后写入 <code class="font-mono">.env</code> 中的 <code class="font-mono">HERMES_DASHBOARD_PORT</code>，
+          需要在 fnOS 应用中心 <strong>停止并启动</strong> Hermes 让新端口生效。
+        </p>
+        <div class="flex flex-wrap items-center gap-2">
+          <UFormField label="新端口（1024-65535）" class="flex-1 min-w-[180px]">
+            <UInput v-model.number="dashboardPortInput" type="number" :min="1024" :max="65535" placeholder="9119" />
+          </UFormField>
+          <UButton color="primary" :loading="portSaving" :disabled="dashboardPortInput === dashboardPort" @click="saveDashboardPort">
+            保存端口
+          </UButton>
+        </div>
+      </div>
+    </UCard>
 
     <UCard class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
       <template #header>

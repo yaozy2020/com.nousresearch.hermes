@@ -22,6 +22,24 @@ echo "===== Hermes FPK 打包 ====="
 echo "[0/6] 写入构建元数据 ..."
 echo "{\"version\":\"$VERSION\"}" > "$APP_SRC/server/modules/build-meta.json"
 
+# v0.30.5: 同步 manifest 版本到 package.json，避免漂移
+if [ -f "$PROJ_DIR/package.json" ]; then
+  python3 - "$PROJ_DIR/package.json" "$VERSION" <<'PY' || echo -e "${YELLOW}  警告：package.json 版本同步失败${NC}"
+import json, sys
+path, ver = sys.argv[1], sys.argv[2]
+with open(path, "r", encoding="utf-8") as f:
+    pkg = json.load(f)
+if pkg.get("version") != ver:
+    pkg["version"] = ver
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(pkg, f, indent=2, ensure_ascii=False)
+        f.write("\n")
+    print(f"  package.json version -> {ver}")
+else:
+    print(f"  package.json version already {ver}")
+PY
+fi
+
 # 1. 准备 build 目录
 echo "[1/6] 准备 build 目录 ..."
 rm -rf "$BUILD_DIR"
@@ -163,3 +181,20 @@ echo ""
 echo -e "${GREEN}===== 打包完成 =====${NC}"
 echo "输出: $OUTPUT"
 ls -lh "$OUTPUT"
+
+# v0.30.5: 计算 fpk SHA256，注入 manifest checksum 字段（闭环防篡改）
+if command -v sha256sum >/dev/null 2>&1; then
+  CHECKSUM=$(sha256sum "$OUTPUT" | awk '{print $1}')
+  echo ""
+  echo "SHA256: $CHECKSUM"
+  # 写回 manifest（仅在工作树中，方便下次发版时 git diff 看见）
+  if grep -q '^checksum' "$PROJ_DIR/manifest"; then
+    sed -i -E "s|^checksum.*$|checksum              = ${CHECKSUM}|" "$PROJ_DIR/manifest"
+    echo "  已写入 manifest checksum 字段（请记得 git commit）"
+  fi
+  # 同时输出 .sha256 文件方便 release 上传
+  echo "$CHECKSUM  $(basename "$OUTPUT")" > "${OUTPUT}.sha256"
+  echo "  校验文件: ${OUTPUT}.sha256"
+else
+  echo -e "${YELLOW}  警告：未找到 sha256sum，跳过 checksum 注入${NC}"
+fi

@@ -191,6 +191,8 @@ async function openDashboard() {
       showNotification('当前为安全模式，Dashboard 仅监听本地地址。如需浏览器直接访问，请在配置中开启不安全模式。', 'info')
       return
     }
+    // v0.30.5: 局域网无认证暴露时给出明确风险提示
+    showNotification('⚠ Dashboard 当前为外部访问模式，无登录鉴权，请仅在可信局域网使用', 'warning')
     const host = window.location.hostname || 'localhost'
     const port = s.port || 9119
     window.open(`http://${host}:${port}`, '_blank', 'noopener')
@@ -353,9 +355,9 @@ onUnmounted(() => {
       <StatusCard
         icon="i-lucide-layout-template"
         :title="dashboard ? (dashboard.running ? '运行中' : '未运行') : '检查中…'"
-        :badge="dashboard ? (dashboard.running ? 'Active' : 'Inactive') : 'Checking'"
-        :color="dashboard ? (dashboard.running ? 'success' : 'neutral') : 'neutral'"
-        :subtitle="dashboard?.running ? `${dashboard.insecure ? '外部访问模式' : '本地安全模式'} · 端口 ${dashboard.port || '-'}` : 'Dashboard Web UI'"
+        :badge="dashboard ? (dashboard.running ? (dashboard.insecure ? '⚠ 未加密' : 'Active') : 'Inactive') : 'Checking'"
+        :color="dashboard ? (dashboard.running ? (dashboard.insecure ? 'error' : 'success') : 'neutral') : 'neutral'"
+        :subtitle="dashboard?.running ? `${dashboard.insecure ? '⚠ 局域网无认证暴露' : '本地安全模式'} · 端口 ${dashboard.port || '-'}` : 'Dashboard Web UI'"
       >
         <template #actions>
           <UButton color="primary" size="sm" :disabled="dashboard?.running" @click="dashboardAction('start')">启动</UButton>

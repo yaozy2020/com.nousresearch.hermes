@@ -1,7 +1,7 @@
 // @bun
 // app_src/server/index.js — Hermes 面板入口（模块化后）
 import { existsSync, chmodSync, readFileSync } from "fs";
-import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig, initConfigModule } from "./modules/config.js";
+import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig, initConfigModule, setEnvKey } from "./modules/config.js";
 import { wsClients, readLogs, log, broadcastLog } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
 import { initI18n, t } from "./modules/i18n.js";
@@ -423,6 +423,23 @@ async function handleRequest(req) {
     if (pathname === "/api/dashboard/lock" && method === "POST") {
       const result = lockDashboardConfig();
       return json(result, result.ok ? 200 : 500);
+    }
+    // v0.30.5: 应用设置 — 单独修改 Dashboard 端口（不需要重装）
+    if (pathname === "/api/settings/dashboard-port" && method === "GET") {
+      return json({ ok: true, port: DASHBOARD_PORT });
+    }
+    if (pathname === "/api/settings/dashboard-port" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const port = parseInt(body && body.port, 10);
+      if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+        return errorResponse("port 必须在 1024-65535 之间", 400, "invalid_port");
+      }
+      const result = setEnvKey("HERMES_DASHBOARD_PORT", String(port));
+      if (!result.ok) return json(result, 400);
+      // 提示：fnOS service 进程启动时已注入 env，单独写 .env 不影响当前进程；
+      // 真正生效需要 fnOS 应用重启。这里仅返回 needsAppRestart 标志让前端给出明确提示。
+      return json({ ok: true, port, needsAppRestart: true });
     }
     if (pathname === "/api/hermes/restart" && method === "POST") {
       const result = await restartHermesAll();
