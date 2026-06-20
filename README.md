@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.30.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.2)
+[![Version](https://img.shields.io/badge/version-0.30.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.3)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,28 +110,24 @@ bash build.sh
 
 ## 版本历史
 
-### v0.30.2（当前版本）
+### v0.30.3（当前版本）
 
-新增 i18n、Provider Marketplace、Backup/Restore、OpenAPI 与移动端 ttyd 体验改进。
+在 v0.30.2 基础上补齐生命周期脚本 + manifest 字段对齐 QwenPaw 规范。
 
-**后端新增 API**：
-- `/api/providers/user` — 自定义 Provider 管理层，叠加在内置 11 个预设之上
-- `/api/backup/*` — 配置备份还原，毫秒级时间戳防覆盖，restore 前自动 safety backup
-- `/api/trust/*` — SHA256 信任清单管理
-- `/api/diagnostics/openapi` + `/api/docs` — OpenAPI 3.1 spec 与内嵌接口列表
+**生命周期脚本补齐**：
+- `cmd/install_init` — 安装前检查 Bun/Node.js/Python 版本 + 磁盘空间，写入 `TRIM_PKGVAR/hermes-install.log`
+- `cmd/upgrade_init` — 升级前检查旧版本运行状态 + 保留运行环境标记，写入 `TRIM_PKGVAR/hermes-upgrade.log`
+- `cmd/config_callback` — 配置变更后自动 restart（复用 `cmd/main restart`），确保 `.env` 保存后立即生效
 
-**前端改进**：
-- ttyd 移动端工具栏重构为双排布局：行 1 特殊键（Ctrl+C / Tab / Esc / ↑↓←→），行 2 工具按钮（A± / 复制屏 / 链接提取 / 粘贴）
-- 复制屏：从 ttyd iframe 读取 xterm 全屏文本，Clipboard API + execCommand 兜底
-- 链接提取：正则匹配 http/https/ws，单条自动复制，多条 URL picker
-- 字体切换：12/14/16/18/20px 循环 + localStorage 持久化
-- `safe-area-inset-bottom` 适配，避免被系统导航条遮挡
+**Manifest 对齐**：
+- 新增 `checkport = false`（主服务走 Unix socket，不适配 TCP 端口检测）
+- changelog 同步更新
 
-**工程化**：
-- 新增 `modules/i18n.js` + `zh-CN.json`，diagnostics 文案走 `t(key)`
-- `broadcastLog` 协议升级携带 `level/code`，前端 `useLogStream` 新增 `alerts` 流
-- `tests/v030-modules.test.js` 11 项新单测，78/78 全过
-- `build.sh` 扩展 native2ascii 范围，打包时转换 `server/**/*.js` 中文字面量为 `\uXXXX`
+**审计机制**：
+- 新增 `AUDIT_REPORT.md`，记录安全/权限/输入校验/前端安全/中文编码状态
+
+**v0.30.2 功能回顾**（已合并）：
+- 新增 i18n、Provider Marketplace、Backup/Restore、OpenAPI 与移动端 ttyd 体验改进。
 
 ### v0.27.0
 
