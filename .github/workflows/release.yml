@@ -16,7 +16,7 @@ permissions:
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,17 +51,7 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install fnpack
-        run: |
-          # fnpack 是飞牛官方打包器；优先尝试 npm 全局安装，失败则从官方仓库下载
-          # NOTE: fnpack 的安装路径可能随官方调整；请按需固化版本号
-          if ! command -v fnpack >/dev/null 2>&1; then
-            echo "fnpack not pre-installed; CI 需要 fnpack 才能打包 fpk。"
-            echo "目前依赖手动维护的 build.sh，本工作流仅做构建可达性验证。"
-            exit 0
-          fi
-
-      - name: Install deps & build
+      - name: Install deps & build frontend
         run: |
           if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
           (cd app_src/ui-vue && (if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi))
@@ -69,24 +59,35 @@ jobs:
       - name: Run tests
         run: npm test
 
-      - name: Build fpk via build.sh
+      - name: Build fpk via fnpackup Docker
         id: build
+        env:
+          FNPAYLOAD: ${{ github.workspace }}/fnpayload
         run: |
-          if ! command -v fnpack >/dev/null 2>&1; then
-            echo "::warning::fnpack 不可用，跳过 fpk 构建。请手动 release。"
-            echo "skipped=true" >> "$GITHUB_OUTPUT"
-            exit 0
+          mkdir -p "$FNPAYLOAD"
+          # 复制项目到 payload 目录（fnpackup 会读取 /app 下的内容）
+          cp -a . "$FNPAYLOAD/"
+          # 在 fnpackup 容器内执行 build.sh
+          docker run --rm \
+            -v "$FNPAYLOAD:/app" \
+            -v "$FNPAYLOAD/dist:/dist" \
+            snltty/fnpackup:v1.1.4 \
+            /bin/bash -c "cd /app && bash build.sh"
+          # 检查产物
+          fpk=$(ls "$FNPAYLOAD"/com.nousresearch.hermes_*.fpk | head -n1)
+          if [ -z "$fpk" ]; then
+            echo "::error::fpk build failed, no output found"
+            exit 1
           fi
-          bash build.sh
-          fpk=$(ls com.nousresearch.hermes_*.fpk | head -n1)
           echo "fpk=$fpk" >> "$GITHUB_OUTPUT"
+          # 复制产物到 workspace 供后续上传
+          cp "$fpk" "${{ github.workspace }}/"
 
       - name: Create GitHub Release
-        if: steps.build.outputs.skipped != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.tag.outputs.tag }}
           name: Hermes Panel ${{ steps.tag.outputs.tag }}
           generate_release_notes: true
           files: |
-            ${{ steps.build.outputs.fpk }}
+            ${{ github.workspace }}/com.nousresearch.hermes_*.fpk
