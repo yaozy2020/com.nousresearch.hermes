@@ -112,7 +112,7 @@ bash build.sh
 
 ### v0.31.1（当前版本）
 
-`hermes.js` 重构 + 子模块化，**无功能变更**，纯结构优化。
+`hermes.js` 重构 + 子模块化 + 图标圆角修正，**无功能变更**，纯结构 + UI 优化。
 
 **拆分结构**：
 
@@ -130,6 +130,10 @@ bash build.sh
 - `index.js` **零改动**（facade 保留全部 17 个原导出）
 - `pipeStream` 子进程日志转发逻辑提取为模块内复用
 - 新增 `tests/hermes-modules.test.js`（25 用例），总 103 → **128 用例全过**
+
+**图标修正**：
+- 保留女孩剪影（黑白），修正圆角为 ~22-25%，与飞牛官方风格对齐
+- 更新 4 个图标文件：`ICON.PNG` / `ICON_256.PNG` / `app_src/ui/images/icon_256.png` / `icon_64.png`
 
 ### v0.31.0
 
