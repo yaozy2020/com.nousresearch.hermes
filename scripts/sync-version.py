@@ -73,8 +73,9 @@ def sync_build_meta(version: str, check: bool) -> tuple[bool, str, str]:
     if not check:
         data["version"] = version
         p.parent.mkdir(parents=True, exist_ok=True)
+        # 与 build.sh 的格式保持一致（无空格紧凑）
         p.write_text(
-            json.dumps(data, ensure_ascii=False) + "\n",
+            json.dumps(data, ensure_ascii=False, separators=(",", ":")) + "\n",
             encoding="utf-8",
         )
     return True, cur, str(p)
