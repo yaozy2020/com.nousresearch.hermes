@@ -1,0 +1,52 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install Bun (for prod build)
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install root deps (no scripts)
+        run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
+
+      - name: Lint server entry (syntax check)
+        run: npm run lint:server
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Install vue UI deps
+        working-directory: app_src/ui-vue
+        run: |
+          if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
+
+      - name: Verify Vue build
+        working-directory: app_src/ui-vue
+        run: npm run build
+
+      - name: Smoke test server import
+        run: |
+          node --check app_src/server/index.js
+          node --check app_src/server/modules/config.js
+          node --check app_src/server/modules/hermes.js
+          node --check app_src/server/modules/logger.js
+          echo "✓ all server modules pass syntax check"
