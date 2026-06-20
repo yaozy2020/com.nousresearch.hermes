@@ -10,6 +10,13 @@ PID_FILE="${TRIM_PKGVAR}/app.pid"
 # 优先使用用户家目录下的 bun（v1.3.14 通过官方脚本安装），其次飞牛应用中心 bunjs
 export PATH="$HOME/.bun/bin:/var/apps/bunjs/target/bin:/var/apps/nodejs_v24/target/bin:$PATH"
 
+# fnOS service 默认 LANG 为空，bun 在空 locale 下会把 utf-8 源文件按 latin-1 解码，
+# 导致中文字面量 "运行时" 变成 3 个 0x80~0xFF char，最终 JSON 响应里输出 \u00e8\u00bf\u0090
+# 而前端 fnOS App WebView 渲染就是经典的 utf-8 当 latin-1 显示乱码（"Bun è¿è¡æ¶"）。
+# 强制 utf-8 locale 让 bun 正确解码源文件。
+export LANG=C.UTF-8
+export LC_ALL=C.UTF-8
+
 # Data directory (@apphome)
 HERMES_DATA_DIR="${TRIM_PKGHOME}/data"
 

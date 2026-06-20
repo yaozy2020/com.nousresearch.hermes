@@ -14,12 +14,16 @@ export function swallowError(context, err) {
 
 /**
  * 统一 API 错误响应格式。
+ * 把非 ASCII 字符转成 \uXXXX，避免某些客户端 WebView 把 utf-8 字节按 latin-1 解码导致乱码。
  */
 export function errorResponse(error, code = null, status = 500) {
   const body = { ok: false, error };
   if (code) body.code = code;
-  return new Response(JSON.stringify(body), {
+  const ascii = JSON.stringify(body).replace(/[\u0080-\uffff]/g, (c) =>
+    "\\u" + ("0000" + c.charCodeAt(0).toString(16)).slice(-4)
+  );
+  return new Response(ascii, {
     status,
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json; charset=utf-8" },
   });
 }

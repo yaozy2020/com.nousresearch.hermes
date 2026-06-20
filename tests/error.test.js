@@ -6,7 +6,7 @@ describe("error", () => {
   it("returns JSON error response with ok=false", async () => {
     const res = errorResponse("something went wrong", "ERR_CODE", 400);
     assert.equal(res.status, 400);
-    assert.equal(res.headers.get("Content-Type"), "application/json");
+    assert.equal(res.headers.get("Content-Type"), "application/json; charset=utf-8");
     const body = await res.json();
     assert.deepEqual(body, { ok: false, error: "something went wrong", code: "ERR_CODE" });
   });

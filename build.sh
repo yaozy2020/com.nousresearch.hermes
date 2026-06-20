@@ -132,6 +132,12 @@ cp -a "$APP_SRC/server" "$APP_DIR/"
 cp -a "$APP_SRC/ui" "$APP_DIR/"
 cp -a "$APP_SRC/bin" "$APP_DIR/"
 
+# fnOS service 启动 bun 1.3.9 时会把 utf-8 源文件按 latin-1 解码（同一个 bun
+# 二进制用 hermes 用户跑就 9 个 char，用其他用户跑就正常 3 个 char，env
+# 完全相同。无法在 fnOS 修复，绕过办法：把所有非 ASCII 字符 \uXXXX 转义。
+echo "  转义 server/*.js 中的非 ASCII 字符（绕过 fnOS bun 加载 bug）..."
+find "$APP_DIR/server" -type f -name "*.js" -print0 | xargs -0 python3 "$PROJ_DIR/scripts/native2ascii.py"
+
 # 4. 复制 manifest / ICON / cmd / config / wizard 到 build 目录
 echo "[4/5] 复制元数据与回调脚本 ..."
 cp "$PROJ_DIR/manifest" "$BUILD_DIR/"

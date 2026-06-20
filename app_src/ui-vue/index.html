@@ -9,12 +9,17 @@
   <link href="https://fonts.bunny.net/css?family=public-sans:400,500,600,700" rel="stylesheet" />
   <title>Hermes AI 助手</title>
   <meta name="description" content="在飞牛 NAS 上管理 Hermes AI Agent 服务。">
+  <!-- 兼容 fnOS 应用网关：URL 可能无尾斜杠。先把推断到的 base 写到 meta，再回落到 <base href> 让相对资源也能加载。
+       useApi.ts 会优先读取 meta；这样即使未来 fnOS 网关前缀变化，也不会因为 fetch 拼错而失败。 -->
+  <meta name="hermes-api-base" content="/" />
   <script>
-    // 兼容 fnOS 应用网关：URL 可能无尾斜杠，动态设置 base 让相对资源路径正确解析
     (function () {
       try {
-        var m = window.location.pathname.match(/^(\/app\/[^/]+)/);
-        var base = m ? (m[1] + '/') : './';
+        var pn = window.location.pathname;
+        var m = pn.match(/^(\/app\/[^/]+)/);
+        var base = m ? (m[1] + '/') : (pn.replace(/[^/]*$/, '') || './');
+        var meta = document.querySelector('meta[name="hermes-api-base"]');
+        if (meta) meta.setAttribute('content', base);
         document.write('<base href="' + base + '">');
       } catch (e) {}
     })();
@@ -27,3 +32,4 @@
 </body>
 
 </html>
+

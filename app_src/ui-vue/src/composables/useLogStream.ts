@@ -7,9 +7,14 @@ import { ref, onUnmounted, type Ref } from 'vue'
 
 function getApiBase(): string {
   if (typeof window === 'undefined') return '/'
+  try {
+    const meta = document.querySelector('meta[name="hermes-api-base"]') as HTMLMetaElement | null
+    const v = meta?.content?.trim()
+    if (v && v !== '/') return v.endsWith('/') ? v : v + '/'
+  } catch { /* ignore */ }
   const pn = window.location.pathname
   const m = pn.match(/^(\/app\/[^/]+)/)
-  return m ? `${m[1]}/` : pn.replace(/[^/]*$/, '')
+  return m ? `${m[1]}/` : (pn.replace(/[^/]*$/, '') || '/')
 }
 
 export interface LogStreamHandle {

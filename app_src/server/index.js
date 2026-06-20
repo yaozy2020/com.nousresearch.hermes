@@ -140,6 +140,91 @@ async function handleRequest(req) {
       }
     }
 
+    if (pathname === "/api/diagnostics" && method === "GET") {
+      // U5: 一键健康自检 — 汇总 6~8 项检查供 UI 展示
+      const checks = [];
+      const push = (id, label, status, detail) => checks.push({ id, label, status, detail });
+
+      // 1) Bun 运行时
+      try {
+        const bv = (typeof Bun !== "undefined" && Bun.version) ? String(Bun.version) : "unknown";
+        const major = parseInt(bv.split(".")[0] || "0", 10);
+        push("bun", "Bun 运行时", major >= 1 ? "ok" : "warn", `v${bv}`);
+      } catch (e) { push("bun", "Bun 运行时", "error", String(e)); }
+
+      // 2) hermes-agent 是否已安装
+      try {
+        const installed = existsSync(HERMES_BIN);
+        push("hermes-bin", "hermes-agent 已安装", installed ? "ok" : "warn",
+          installed ? HERMES_BIN : "未安装，请先到「快速向导」安装");
+      } catch (e) { push("hermes-bin", "hermes-agent 已安装", "error", String(e)); }
+
+      // 3) Gateway 是否运行
+      try {
+        const running = isGatewayRunning();
+        push("gateway", "Gateway 主进程", running ? "ok" : "warn",
+          running ? `运行中 (PID ${getGatewayPid()}, 已运行 ${getGatewayUptime()}s)` : "未启动");
+      } catch (e) { push("gateway", "Gateway 主进程", "error", String(e)); }
+
+      // 4) Dashboard 是否运行
+      try {
+        const running = isDashboardRunning();
+        push("dashboard", "Dashboard", running ? "ok" : "warn",
+          running ? `运行中 (PID ${getDashboardPid()}, 端口 ${DASHBOARD_PORT})` : "未启动");
+      } catch (e) { push("dashboard", "Dashboard", "error", String(e)); }
+
+      // 5) Provider API Key 是否配置（看 .env / config.yaml 是否含至少一个 *_API_KEY=非空 / 非 __MASKED__）
+      try {
+        const cfg = readConfig();
+        const envText = cfg.env || "";
+        let keyOk = false;
+        let providerName = "";
+        for (const line of envText.split(/\r?\n/)) {
+          const m = line.match(/^([A-Z][A-Z0-9_]*_API_KEY)\s*=\s*(.+)$/);
+          if (!m) continue;
+          const v = m[2].trim();
+          if (v && v !== "__MASKED__" && !v.startsWith("#")) {
+            keyOk = true;
+            providerName = m[1];
+            break;
+          }
+        }
+        push("provider-key", "Provider API Key", keyOk ? "ok" : "warn",
+          keyOk ? `已配置 ${providerName}` : "未配置任何 *_API_KEY，调用 LLM 时会 401");
+      } catch (e) { push("provider-key", "Provider API Key", "error", String(e)); }
+
+      // 6) Provider 选择（config.yaml 里有 provider 字段）
+      try {
+        const cfg = readConfig();
+        const yaml = cfg.yaml || "";
+        const m = yaml.match(/^\s*provider\s*:\s*(\S+)/m);
+        push("provider-cfg", "Provider 已选择", m ? "ok" : "warn",
+          m ? `provider: ${m[1]}` : "config.yaml 中未发现 provider 字段");
+      } catch (e) { push("provider-cfg", "Provider 已选择", "error", String(e)); }
+
+      // 7) Dashboard 安全模式
+      try {
+        const insecure = process.env.HERMES_DASHBOARD_INSECURE !== "0";
+        push("dashboard-mode", "Dashboard 监听模式",
+          insecure ? "warn" : "ok",
+          insecure ? "外部访问模式（0.0.0.0），如需仅本地请到「高级」锁回" : "本地安全模式（127.0.0.1）");
+      } catch (e) { push("dashboard-mode", "Dashboard 监听模式", "error", String(e)); }
+
+      // 8) ttyd 二进制
+      try {
+        const ok = existsSync(TTYD_BIN);
+        push("ttyd", "ttyd 终端二进制", ok ? "ok" : "error",
+          ok ? TTYD_BIN : "未找到 ttyd，CLI 终端无法启动");
+      } catch (e) { push("ttyd", "ttyd 终端二进制", "error", String(e)); }
+
+      const summary = {
+        ok: checks.filter(c => c.status === "ok").length,
+        warn: checks.filter(c => c.status === "warn").length,
+        error: checks.filter(c => c.status === "error").length,
+      };
+      return json({ ok: true, summary, checks, time: new Date().toISOString() });
+    }
+
     if (pathname === "/api/health" && method === "GET") {
       return json({
         ok: true,

@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.26.6-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.26.6)
+[![Version](https://img.shields.io/badge/version-0.27.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.27.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -109,7 +109,17 @@ bash build.sh
 
 ## 版本历史
 
-### v0.26.6（当前版本）
+### v0.27.0（当前版本）
+
+基础设施周 — 自检 / API 鲁棒性 / CI 工程化：
+
+- **状态总览健康自检**：新增 `GET /api/diagnostics` 一次性检查 8 项（Bun、hermes-agent、Gateway / Dashboard 进程、Provider Key / 选择、监听模式、ttyd 二进制）；首页一个按钮触发，OK / 警告 / 错误三色展开。
+- **API base 鲁棒化**：`index.html` 启动时把推断到的网关前缀写入 `<meta name="hermes-api-base">`，`useApi` / `useLogStream` 优先读 meta，回落 URL 正则；fnOS 网关路径变化时不会再 fetch 拼错。
+- **CI / Release 工作流**：`.github/workflows/ci.yml` 在 PR / push 上跑 lint + test + Vue 构建；`.github/workflows/release.yml` 在 tag 推送时自动构建并发版（fnpack 不可用时降级为告警，仍可手动 release）。
+- **lint:server 扩展**：从单文件升级为遍历 `app_src/server/modules/*.js` 做语法检查。
+- **测试增强**：新增 `tests/providers-json.test.js`（schema 校验）与 `tests/integration-server.test.js`（Bun 起 unix socket 端到端，无 bun 自动跳过）。
+
+### v0.26.6 ~ v0.26.8
 
 安全收敛与体验细节优化：
 - **终端边界明确化**：`/api/terminal/send` 增加 4KB 长度限制，并在源码注释中明示「白名单只在 ttyd 启动时校验 argv，启动后子命令的交互式输入由该子命令自身负责」。

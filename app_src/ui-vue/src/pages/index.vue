@@ -146,6 +146,38 @@ async function hermesRestartAll() {
   }
 }
 
+// U5: 健康自检
+interface DiagCheck { id: string; label: string; status: 'ok' | 'warn' | 'error'; detail: string }
+interface DiagSummary { ok: number; warn: number; error: number }
+const diagLoading = ref(false)
+const diagOpen = ref(false)
+const diagSummary = ref<DiagSummary | null>(null)
+const diagChecks = ref<DiagCheck[]>([])
+const diagTime = ref<string>('')
+
+async function runDiagnostics() {
+  diagLoading.value = true
+  diagOpen.value = true
+  try {
+    const r = await api<{ ok: boolean; summary: DiagSummary; checks: DiagCheck[]; time: string }>('api/diagnostics')
+    if (r.ok) {
+      diagSummary.value = r.summary
+      diagChecks.value = r.checks || []
+      diagTime.value = r.time || new Date().toISOString()
+      const totalIssues = (r.summary.warn || 0) + (r.summary.error || 0)
+      if (totalIssues === 0) showNotification('健康自检：全部通过 ✓', 'success')
+      else showNotification(`健康自检：${r.summary.ok} 通过 / ${r.summary.warn} 警告 / ${r.summary.error} 错误`, totalIssues > r.summary.warn ? 'error' : 'warning')
+    } else {
+      showNotification('健康自检失败', 'error')
+    }
+  } catch (e: unknown) {
+    const err = e as Error
+    showNotification('健康自检失败: ' + (err?.message ?? String(e)), 'error')
+  } finally {
+    diagLoading.value = false
+  }
+}
+
 async function openDashboard() {
   try {
     const s = await api<DashboardStatus>('api/dashboard/status')
@@ -217,6 +249,15 @@ onUnmounted(() => {
       </div>
       <div class="flex flex-wrap items-center gap-2">
         <UButton
+          color="primary"
+          variant="outline"
+          icon="i-lucide-stethoscope"
+          :loading="diagLoading"
+          @click="runDiagnostics"
+        >
+          健康自检
+        </UButton>
+        <UButton
           color="error"
           variant="solid"
           icon="i-lucide-rotate-ccw"
@@ -236,6 +277,42 @@ onUnmounted(() => {
         </UButton>
       </div>
     </div>
+
+    <!-- U5: 健康自检结果折叠面板 -->
+    <UCard v-if="diagOpen" class="bg-[var(--ui-bg-card)] shadow-sm" :ui="{ root: 'ring-0 divide-y-0', body: 'p-5' }">
+      <template #header>
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-2">
+            <UIcon name="i-lucide-stethoscope" class="w-5 h-5 text-primary" />
+            <span class="font-semibold text-[var(--ui-text)]">健康自检</span>
+            <UBadge v-if="diagSummary" color="success" variant="soft" size="xs">{{ diagSummary.ok }} OK</UBadge>
+            <UBadge v-if="diagSummary && diagSummary.warn > 0" color="warning" variant="soft" size="xs">{{ diagSummary.warn }} 警告</UBadge>
+            <UBadge v-if="diagSummary && diagSummary.error > 0" color="error" variant="soft" size="xs">{{ diagSummary.error }} 错误</UBadge>
+          </div>
+          <UButton color="neutral" variant="ghost" size="xs" icon="i-lucide-x" @click="diagOpen = false" />
+        </div>
+      </template>
+      <div class="space-y-2">
+        <div v-if="diagLoading && diagChecks.length === 0" class="text-sm text-[var(--ui-text-muted)]">检查中…</div>
+        <div
+          v-for="c in diagChecks"
+          :key="c.id"
+          class="flex items-start gap-3 p-3 rounded-lg border border-[var(--ui-border)]"
+          :class="c.status === 'error' ? 'bg-error/5 border-error/30' : c.status === 'warn' ? 'bg-warning/5 border-warning/30' : 'bg-[var(--ui-bg-elevated)]/50'"
+        >
+          <UIcon
+            :name="c.status === 'ok' ? 'i-lucide-check-circle-2' : c.status === 'warn' ? 'i-lucide-alert-triangle' : 'i-lucide-x-circle'"
+            :class="c.status === 'ok' ? 'text-success' : c.status === 'warn' ? 'text-warning' : 'text-error'"
+            class="w-5 h-5 mt-0.5 shrink-0"
+          />
+          <div class="flex-1 min-w-0">
+            <div class="font-medium text-[var(--ui-text)]">{{ c.label }}</div>
+            <div class="text-xs text-[var(--ui-text-muted)] mt-1 break-all">{{ c.detail }}</div>
+          </div>
+        </div>
+        <div v-if="diagTime" class="text-xs text-[var(--ui-text-muted)] mt-2 text-right">检查时间：{{ new Date(diagTime).toLocaleString() }}</div>
+      </div>
+    </UCard>
 
     <!-- 状态卡片 -->
     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-stretch auto-rows-fr">
