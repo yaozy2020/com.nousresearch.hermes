@@ -2,6 +2,8 @@
  * Hermes 日志流 composable
  * 通过 WebSocket 订阅 /api/logs/stream，把后端 broadcastLog 推过来的日志
  * 累积成响应式数组，供 UI 实时显示。
+ *
+ * v0.30: 增加 alerts 流（仅 warn/error 级别），供上层弹 toast 用。
  */
 import { ref, onUnmounted, type Ref } from 'vue'
 
@@ -17,20 +19,40 @@ function getApiBase(): string {
   return m ? `${m[1]}/` : (pn.replace(/[^/]*$/, '') || '/')
 }
 
+export interface LogAlert {
+  level: 'warn' | 'error'
+  text: string
+  source: string
+  code?: string
+  ts: number
+}
+
 export interface LogStreamHandle {
   lines: Ref<string[]>
+  alerts: Ref<LogAlert[]>
   connected: Ref<boolean>
   start: () => void
   stop: () => void
   clear: () => void
+  onAlert: (cb: (a: LogAlert) => void) => () => void
 }
 
 export function useLogStream(maxLines = 500): LogStreamHandle {
   const lines = ref<string[]>([])
+  const alerts = ref<LogAlert[]>([])
   const connected = ref(false)
   let ws: WebSocket | null = null
   let manualStop = false
   let retryTimer: ReturnType<typeof setTimeout> | null = null
+  const alertSubs = new Set<(a: LogAlert) => void>()
+
+  function emitAlert(a: LogAlert) {
+    alerts.value.push(a)
+    if (alerts.value.length > 50) alerts.value.splice(0, alerts.value.length - 50)
+    for (const cb of alertSubs) {
+      try { cb(a) } catch { /* ignore */ }
+    }
+  }
 
   function connect() {
     if (ws && ws.readyState !== WebSocket.CLOSED) return
@@ -49,6 +71,16 @@ export function useLogStream(maxLines = 500): LogStreamHandle {
             for (const p of parts) lines.value.push(p)
             if (lines.value.length > maxLines) {
               lines.value.splice(0, lines.value.length - maxLines)
+            }
+            // v0.30: warn / error 级别 → 抛 alert 给 UI 弹 toast
+            if (msg.level === 'warn' || msg.level === 'error') {
+              emitAlert({
+                level: msg.level,
+                text: String(msg.data),
+                source: typeof msg.source === 'string' ? msg.source : 'panel',
+                code: typeof msg.code === 'string' ? msg.code : undefined,
+                ts: Date.now()
+              })
             }
           }
         } catch {
@@ -85,9 +117,15 @@ export function useLogStream(maxLines = 500): LogStreamHandle {
 
   function clear() {
     lines.value = []
+    alerts.value = []
+  }
+
+  function onAlert(cb: (a: LogAlert) => void): () => void {
+    alertSubs.add(cb)
+    return () => alertSubs.delete(cb)
   }
 
   onUnmounted(() => stop())
 
-  return { lines, connected, start, stop, clear }
+  return { lines, alerts, connected, start, stop, clear, onAlert }
 }

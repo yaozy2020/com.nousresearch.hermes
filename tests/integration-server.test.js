@@ -11,10 +11,22 @@ import { request as httpRequest } from "node:http";
 function bunAvailable() {
   try {
     const r = spawnSync("bun", ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
+    if (r.status === 0) return true;
+  } catch {}
+  // 兼容飞牛 NAS：bun 不在 PATH，但 /var/apps/bunjs/target/bin/bun 可用
+  try {
+    const r = spawnSync("/var/apps/bunjs/target/bin/bun", ["--version"], { stdio: ["ignore", "pipe", "pipe"] });
     return r.status === 0;
   } catch {
     return false;
   }
+}
+
+function bunBin() {
+  try {
+    if (spawnSync("bun", ["--version"], { stdio: ["ignore", "pipe", "pipe"] }).status === 0) return "bun";
+  } catch {}
+  return "/var/apps/bunjs/target/bin/bun";
 }
 
 const SOCKET = join(tmpdir(), `hermes-test-${process.pid}.sock`);
@@ -52,7 +64,7 @@ async function waitForSocket(timeoutMs = 8000) {
 
 describe("integration · /api/diagnostics + /api/providers/presets", { skip: !bunAvailable() && "bun runtime not available" }, () => {
   before(async () => {
-    serverProc = spawn("bun", ["app_src/server/index.js"], {
+    serverProc = spawn(bunBin(), ["app_src/server/index.js"], {
       env: {
         ...process.env,
         SOCKET_PATH: SOCKET,
@@ -81,7 +93,8 @@ describe("integration · /api/diagnostics + /api/providers/presets", { skip: !bu
     assert.equal(r.status, 200);
     const data = JSON.parse(r.body);
     assert.equal(data.ok, true);
-    assert.ok(typeof data.version === "string");
+    // version 可能是字符串（旧实现）或对象 { panel, hermes, ... }（v0.27+）
+    assert.ok(data.version && (typeof data.version === "string" || typeof data.version === "object"));
   });
 
   it("GET /api/providers/presets returns built-in presets", async () => {

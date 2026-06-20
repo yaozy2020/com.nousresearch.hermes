@@ -1,0 +1,22 @@
+{
+  "diag.bun_runtime": "Bun 运行时",
+  "diag.hermes_installed": "hermes-agent 已安装",
+  "diag.hermes_not_installed": "未安装，请先到「快速向导」安装",
+  "diag.gateway": "Gateway 主进程",
+  "diag.dashboard": "Dashboard",
+  "diag.running_with_pid_uptime": "运行中 (PID {pid}, 已运行 {uptime}s)",
+  "diag.running_with_pid_port": "运行中 (PID {pid}, 端口 {port})",
+  "diag.not_started": "未启动",
+  "diag.provider_api_key": "Provider API Key",
+  "diag.provider_api_key_ok": "已配置 {name}",
+  "diag.provider_api_key_warn": "未配置任何 *_API_KEY，调用 LLM 时会 401",
+  "diag.provider_selected": "Provider 已选择",
+  "diag.provider_selected_warn": "config.yaml 中未发现 provider 字段",
+  "diag.dashboard_listen": "Dashboard 监听模式",
+  "diag.dashboard_local": "仅本地访问 (127.0.0.1)，安全",
+  "diag.dashboard_external": "外部访问模式 (0.0.0.0)，如需仅本地请到「高级」锁回",
+  "diag.ttyd_bin": "ttyd 终端二进制",
+  "diag.ttyd_bin_missing": "未找到 ttyd 二进制，终端功能不可用",
+  "alert.diag_warn": "健康自检发现 {warn} 个警告",
+  "alert.diag_error": "健康自检发现 {error} 个错误"
+}

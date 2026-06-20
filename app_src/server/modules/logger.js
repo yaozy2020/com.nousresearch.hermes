@@ -106,14 +106,21 @@ export function log(levelOrSource, ...args) {
 /**
  * 同时广播给前端并落盘。
  * 若 text 以 [source] 开头，自动解析为来源；否则 source=panel。
+ *
+ * @param {string} text 日志原文
+ * @param {object} [opts] 可选 { level: "info"|"warn"|"error", code?: string }
+ *        level 用于前端 toast 弹窗（warn/error 触发）
  */
-export function broadcastLog(text) {
+export function broadcastLog(text, opts = {}) {
   const match = String(text).match(/^\[(\w+)\]\s*/);
   const source = match ? match[1] : "panel";
   const cleanText = match ? text.slice(match[0].length) : text;
-  log(source, "info", cleanText);
+  const level = VALID_LEVELS.has(opts.level) ? opts.level : "info";
+  log(source, level, cleanText);
 
-  const msg = JSON.stringify({ type: "log", data: text });
+  const payload = { type: "log", data: text, level, source };
+  if (opts.code) payload.code = String(opts.code);
+  const msg = JSON.stringify(payload);
   for (const ws of wsClients) {
     try {
       if (ws.readyState === 1) ws.send(msg);

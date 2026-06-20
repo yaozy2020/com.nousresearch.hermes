@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.27.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.27.0)
+[![Version](https://img.shields.io/badge/version-0.30.2-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.30.2)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -18,10 +18,14 @@
 
 - **现代控制面板** — Bun + Unix socket + fnOS gatewaySocket，无 Docker 依赖；前端基于 Vue 3 + Nuxt UI v4 + TailwindCSS v4 工程化构建，复用 QwenPaw 设计语言
 - **4 步快速向导** — 检查 Hermes 安装 → 选择 Provider 预设 → 启动 Gateway → 启动 Dashboard
-- **多 Provider 预设** — OpenRouter / OpenCode-Zen / OpenCode-Go / DeepSeek / GLM / Kimi / MiniMax / Anthropic / Gemini / OpenAI，选中后可修改 Base URL 并选填 API Key
+- **多 Provider 预设 + Marketplace** — 内置 OpenRouter / OpenCode-Zen / OpenCode-Go / DeepSeek / GLM / Kimi / MiniMax / Anthropic / Gemini / OpenAI 等 11 个预设，外加 `/api/providers/user` 自定义层叠加
 - **消息频道管理** — 内置 Telegram / Slack / Discord / QQBot / 企业微信 5 个绿色频道直接表单配置（写 .env，重启 Gateway 立即生效），进阶/外部依赖频道引导跳转 Dashboard
-- **状态总览** — Hermes / Gateway / Dashboard / CLI 终端 多进程实时监控，5 秒自动刷新
-- **CLI 终端** — 内置 ttyd 浏览器终端，一键运行 `hermes setup / model / login / gateway setup / doctor / status`
+- **状态总览 + 健康自检** — Hermes / Gateway / Dashboard / CLI 终端 多进程实时监控 5 秒自动刷新；`/api/diagnostics` 一次性 8 项检查（Bun / hermes-agent / 进程 / Provider Key / 监听模式 / ttyd），异常自动 toast 推送
+- **CLI 终端（移动端友好）** — 内置 ttyd 浏览器终端 + 双排移动工具栏：行 1 特殊键（Ctrl+C / Tab / Esc / ↑↓←→），行 2 工具按钮（A± 字体 / 📋 复制屏 / 🔗 链接提取 / 粘贴）
+- **备份 / 还原** — `/api/backup/list | create | restore | delete` 一键打包 `.env` / `config.yaml` / `.hermes-config` / `channels`，毫秒级时间戳防冲突，restore 前自动 safety backup
+- **OpenAPI 3.1 规范 + 内嵌 Swagger UI** — `/api/diagnostics/openapi` 出 spec，`/api/docs` 提供无 CDN 依赖的端点列表
+- **SHA256 信任清单** — `/api/trust/list | add | delete`，hex 严格校验 + 自动小写归一，可被 hermes 安装流程引用
+- **i18n 框架** — `server/modules/i18n.js` + `zh-CN.json` 字典加载，`HERMES_LOCALE` 环境变量切换语言
 - **高级配置** — YAML / ENV 双编辑器，直接编辑 Hermes 配置文件
 - **主题跟随飞牛系统** — 读取飞牛桌面写入的 `DesktopConfig-1000` localStorage 配置，自动同步亮暗模式与系统视觉统一；支持 6 种主题色（天空蓝 / 落日橙 / 星云紫 / 极光青 / 玫瑰红 / 系统默认）
 - **响应式布局** — 桌面端侧边栏导航 + 移动端底部 Tab 栏，自动适配 1024 / 768 / 380px 断点
@@ -109,7 +113,27 @@ bash build.sh
 
 ## 版本历史
 
-### v0.27.0（当前版本）
+### v0.30.2（当前版本）
+
+任务模式合并版 — i18n / Marketplace API / Backup / OpenAPI / 移动端 ttyd 体验一次性收尾：
+
+- **i18n 框架**：`server/modules/i18n.js` + `zh-CN.json` 字典加载，diagnostics 全部文案走 `t(key)`，源中文字面量大幅减少（与 native2ascii 兜底并存）。
+- **Provider Marketplace 后端 API**：`/api/providers/user` GET / POST / DELETE 管理用户自定义 provider，自动叠加在内置 11 个之上；name 冲突 / env_key 格式 / base_url 协议严格校验。
+- **Backup / Restore 三件套**：`/api/backup/list | create | restore | {id}` 以毫秒精度时间戳命名，仅打包 `.env` / `config.yaml` / `.hermes-config` / `channels` 子集，restore 前自动 safety backup。
+- **OpenAPI 3.1 + 内嵌 Swagger UI**：`/api/diagnostics/openapi` 出 JSON spec，`/api/docs` 提供无 CDN 依赖的最小 HTML 列表。
+- **SHA256 信任清单**：`/api/trust/list | add | delete`，hex 严格校验、自动小写归一，可被 hermes 安装流程引用做哈希校验。
+- **健康自检异常 toast**：`broadcastLog` 协议升级携带 `level / code`，前端 `useLogStream` 新增 `alerts` 流 + `onAlert()` 回调，App.vue 全局监听 warn / error 弹 `@nuxt/ui 4` `useToast`。
+- **ttyd 移动端三件套**（v0.30.1 + v0.30.2 合入）：
+  - 📋 复制屏：从 ttyd iframe 读取 xterm 全屏文本一键到剪贴板。
+  - 🔗 链接：自动识别屏幕中 http/https/ws 链接，单条自动复制，多条弹选择器（复制 + 新标签打开）。
+  - A± 字体切换：12 / 14 / 16 / 18 / 20 px 循环 + localStorage 持久化。
+  - 工具栏拆双排：行 1 特殊键（Ctrl+C / Tab / Esc / ↑↓←→），行 2 工具按钮（A± / 📋 / 🔗 / 粘贴），蓝绿色调区分主操作。
+  - 底部 `safe-area-inset-bottom` 适配，避免被手机 Home 条遮挡。
+- **测试**：`tests/v030-modules.test.js` 新增 backup / providers / trust 11 项单测；67 → **78 / 78 全过**。
+- **集成测试鲁棒化**：`tests/integration-server.test.js` 兼容 `/var/apps/bunjs/target/bin/bun` 路径与 version 对象 / 字符串两种返回格式。
+- **build.sh native2ascii 范围扩展**：在 `cp -a app_src/server build/app/` 之后跑 `find ... | xargs python3 scripts/native2ascii.py`，所有 server / *.js 中文字面量在打包时转 `\uXXXX` 转义，彻底绕过 fnOS bun 1.3.9 utf-8 源解码 bug。
+
+### v0.27.0
 
 基础设施周 — 自检 / API 鲁棒性 / CI 工程化：
 
@@ -118,6 +142,7 @@ bash build.sh
 - **CI / Release 工作流**：`.github/workflows/ci.yml` 在 PR / push 上跑 lint + test + Vue 构建；`.github/workflows/release.yml` 在 tag 推送时自动构建并发版（fnpack 不可用时降级为告警，仍可手动 release）。
 - **lint:server 扩展**：从单文件升级为遍历 `app_src/server/modules/*.js` 做语法检查。
 - **测试增强**：新增 `tests/providers-json.test.js`（schema 校验）与 `tests/integration-server.test.js`（Bun 起 unix socket 端到端，无 bun 自动跳过）。
+- **修复 fnOS App WebView 中文乱码**：根因 fnOS service 启动 bun 1.3.9 时按 latin-1 解码 utf-8 源（同一 binary 同 env，仅 UID 不同就行为不同）；通过 `scripts/native2ascii.py` + build.sh hook 在打包时把所有 `server/**/*.js` 非 ASCII 字符转 `\uXXXX` 转义彻底绕过。
 
 ### v0.26.6 ~ v0.26.8
 

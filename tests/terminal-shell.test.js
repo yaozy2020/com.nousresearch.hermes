@@ -14,33 +14,33 @@ describe("terminal-shell", () => {
   it("rejects interactive shell", () => {
     const result = validateCommand([]);
     assert.equal(result.ok, false);
-    assert.match(result.error, /交互式 shell/);
+    assert.match(result.error, /\u4ea4\u4e92\u5f0f shell/);
   });
 
   it("rejects non-hermes commands", () => {
     const result = validateCommand(["rm", "-rf", "/"]);
     assert.equal(result.ok, false);
-    assert.match(result.error, /只允许执行 hermes/);
+    assert.match(result.error, /\u53ea\u5141\u8bb8\u6267\u884c hermes/);
   });
 
   it("rejects shell metacharacters", () => {
     for (const ch of [";", "|", "&", "$", "`", "\\", "(", ")", "{", "}", "<", ">"]) {
       const result = validateCommand(["hermes", "status" + ch]);
       assert.equal(result.ok, false);
-      assert.match(result.error, /非法字符/);
+      assert.match(result.error, /\u975e\u6cd5\u5b57\u7b26/);
     }
   });
 
   it("rejects disallowed subcommand", () => {
     const result = validateCommand(["hermes", "eval"]);
     assert.equal(result.ok, false);
-    assert.match(result.error, /不在允许列表/);
+    assert.match(result.error, /\u4e0d\u5728\u5141\u8bb8\u5217\u8868/);
   });
 
   it("rejects argument length mismatch", () => {
     const result = validateCommand(["hermes", "gateway"]);
     assert.equal(result.ok, false);
-    assert.match(result.error, /参数不匹配/);
+    assert.match(result.error, /\u53c2\u6570\u4e0d\u5339\u914d/);
   });
 
   it("matches SHELL_METACHARS_RE for known dangerous chars", () => {

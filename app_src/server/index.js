@@ -2,8 +2,16 @@
 // app_src/server/index.js — Hermes 面板入口（模块化后）
 import { existsSync, chmodSync, readFileSync } from "fs";
 import { CHANNEL_FIELDS, readConfig, writeConfig, readChannels, writeChannel, deleteChannel, lockDashboardConfig, initConfigModule } from "./modules/config.js";
-import { wsClients, readLogs, log } from "./modules/logger.js";
+import { wsClients, readLogs, log, broadcastLog } from "./modules/logger.js";
 import { json, parseBody } from "./modules/utils.js";
+import { initI18n, t } from "./modules/i18n.js";
+import { listBackups, createBackup, restoreBackup, deleteBackup } from "./modules/backup.js";
+import { getEffectiveProviders, getUserProviders, addUserProvider, deleteUserProvider } from "./modules/providers.js";
+import { listTrustedHashes, addTrustedHash, deleteTrustedHash } from "./modules/trust.js";
+import { getOpenApi, renderSwaggerHtml } from "./modules/openapi.js";
+
+// 启动时初始化 i18n（默认 zh-CN，未来可读 process.env.HERMES_LOCALE）
+initI18n(process.env.HERMES_LOCALE || "zh-CN");
 
 async function safeParseBody(req) {
   try {
@@ -127,53 +135,119 @@ async function handleRequest(req) {
 
     if (pathname === "/api/providers/presets" && method === "GET") {
       try {
-        // 优先从用户可覆盖的位置读取，回落到内置 modules/providers.json
-        const userPath = `${DATA_DIR}/providers.json`;
-        const builtinPath = `${import.meta.dir}/modules/providers.json`;
-        const path = existsSync(userPath) ? userPath : builtinPath;
-        const raw = readFileSync(path, "utf-8");
-        const parsed = JSON.parse(raw);
-        return json({ ok: true, source: path === userPath ? "user" : "builtin", ...parsed });
+        // v0.30: 用 providers 模块统一加载 + 合并 user 覆盖
+        const data = getEffectiveProviders();
+        return json({ ok: true, ...data });
       } catch (err) {
-        log("config", "warn", "providers.json load failed:", err.message);
+        log("warn", "providers presets load failed:", err.message);
         return json({ ok: false, error: String(err.message || err), presets: [] }, 500);
       }
     }
 
+    if (pathname === "/api/providers/user" && method === "GET") {
+      return json({ ok: true, presets: getUserProviders() });
+    }
+    if (pathname === "/api/providers/user" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const r = addUserProvider(body || {});
+      return json(r, r.ok ? 200 : 400);
+    }
+    {
+      const m = pathname.match(/^\/api\/providers\/user\/([A-Za-z0-9_.-]{1,64})$/);
+      if (m && method === "DELETE") {
+        const r = deleteUserProvider(m[1]);
+        return json(r, r.ok ? 200 : 404);
+      }
+    }
+
+    // === Backup / Restore ===
+    if (pathname === "/api/backup/list" && method === "GET") {
+      return json({ ok: true, backups: listBackups() });
+    }
+    if (pathname === "/api/backup/create" && method === "POST") {
+      const r = createBackup();
+      return json(r, r.ok ? 200 : 500);
+    }
+    if (pathname === "/api/backup/restore" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      if (!body.id) return json({ ok: false, error: "missing id" }, 400);
+      const r = restoreBackup(body.id);
+      return json(r, r.ok ? 200 : 400);
+    }
+    {
+      const m = pathname.match(/^\/api\/backup\/([A-Za-z0-9._-]+)$/);
+      if (m && method === "DELETE") {
+        const r = deleteBackup(m[1]);
+        return json(r, r.ok ? 200 : 404);
+      }
+    }
+
+    // === Trust list (SHA256) ===
+    if (pathname === "/api/trust/list" && method === "GET") {
+      return json({ ok: true, hashes: listTrustedHashes() });
+    }
+    if (pathname === "/api/trust/add" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const r = addTrustedHash(body && body.hash);
+      return json(r, r.ok ? 200 : 400);
+    }
+    if (pathname === "/api/trust/delete" && method === "POST") {
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const r = deleteTrustedHash(body && body.hash);
+      return json(r, r.ok ? 200 : 400);
+    }
+
+    // === OpenAPI / Swagger ===
+    if (pathname === "/api/diagnostics/openapi" && method === "GET") {
+      return json(getOpenApi());
+    }
+    if (pathname === "/api/docs" && method === "GET") {
+      return new Response(renderSwaggerHtml(), {
+        headers: { "Content-Type": "text/html; charset=utf-8" }
+      });
+    }
+
     if (pathname === "/api/diagnostics" && method === "GET") {
       // U5: 一键健康自检 — 汇总 6~8 项检查供 UI 展示
+      // 使用 i18n 字典（modules/i18n/zh-CN.json）以避免源码中文字面量在 fnOS bun 加载时被错误解码。
       const checks = [];
       const push = (id, label, status, detail) => checks.push({ id, label, status, detail });
 
-      // 1) Bun 运行时
+      // 1) Bun runtime
       try {
         const bv = (typeof Bun !== "undefined" && Bun.version) ? String(Bun.version) : "unknown";
         const major = parseInt(bv.split(".")[0] || "0", 10);
-        push("bun", "Bun 运行时", major >= 1 ? "ok" : "warn", `v${bv}`);
-      } catch (e) { push("bun", "Bun 运行时", "error", String(e)); }
+        push("bun", t("diag.bun_runtime"), major >= 1 ? "ok" : "warn", `v${bv}`);
+      } catch (e) { push("bun", t("diag.bun_runtime"), "error", String(e)); }
 
-      // 2) hermes-agent 是否已安装
+      // 2) hermes-agent installed
       try {
         const installed = existsSync(HERMES_BIN);
-        push("hermes-bin", "hermes-agent 已安装", installed ? "ok" : "warn",
-          installed ? HERMES_BIN : "未安装，请先到「快速向导」安装");
-      } catch (e) { push("hermes-bin", "hermes-agent 已安装", "error", String(e)); }
+        push("hermes-bin", t("diag.hermes_installed"), installed ? "ok" : "warn",
+          installed ? HERMES_BIN : t("diag.hermes_not_installed"));
+      } catch (e) { push("hermes-bin", t("diag.hermes_installed"), "error", String(e)); }
 
-      // 3) Gateway 是否运行
+      // 3) Gateway running
       try {
         const running = isGatewayRunning();
-        push("gateway", "Gateway 主进程", running ? "ok" : "warn",
-          running ? `运行中 (PID ${getGatewayPid()}, 已运行 ${getGatewayUptime()}s)` : "未启动");
-      } catch (e) { push("gateway", "Gateway 主进程", "error", String(e)); }
+        push("gateway", t("diag.gateway"), running ? "ok" : "warn",
+          running ? t("diag.running_with_pid_uptime", { pid: getGatewayPid(), uptime: getGatewayUptime() })
+                  : t("diag.not_started"));
+      } catch (e) { push("gateway", t("diag.gateway"), "error", String(e)); }
 
-      // 4) Dashboard 是否运行
+      // 4) Dashboard running
       try {
         const running = isDashboardRunning();
-        push("dashboard", "Dashboard", running ? "ok" : "warn",
-          running ? `运行中 (PID ${getDashboardPid()}, 端口 ${DASHBOARD_PORT})` : "未启动");
-      } catch (e) { push("dashboard", "Dashboard", "error", String(e)); }
+        push("dashboard", t("diag.dashboard"), running ? "ok" : "warn",
+          running ? t("diag.running_with_pid_port", { pid: getDashboardPid(), port: DASHBOARD_PORT })
+                  : t("diag.not_started"));
+      } catch (e) { push("dashboard", t("diag.dashboard"), "error", String(e)); }
 
-      // 5) Provider API Key 是否配置（看 .env / config.yaml 是否含至少一个 *_API_KEY=非空 / 非 __MASKED__）
+      // 5) Provider API Key
       try {
         const cfg = readConfig();
         const envText = cfg.env || "";
@@ -189,39 +263,49 @@ async function handleRequest(req) {
             break;
           }
         }
-        push("provider-key", "Provider API Key", keyOk ? "ok" : "warn",
-          keyOk ? `已配置 ${providerName}` : "未配置任何 *_API_KEY，调用 LLM 时会 401");
-      } catch (e) { push("provider-key", "Provider API Key", "error", String(e)); }
+        push("provider-key", t("diag.provider_api_key"), keyOk ? "ok" : "warn",
+          keyOk ? t("diag.provider_api_key_ok", { name: providerName }) : t("diag.provider_api_key_warn"));
+      } catch (e) { push("provider-key", t("diag.provider_api_key"), "error", String(e)); }
 
-      // 6) Provider 选择（config.yaml 里有 provider 字段）
+      // 6) Provider selected
       try {
         const cfg = readConfig();
         const yaml = cfg.yaml || "";
         const m = yaml.match(/^\s*provider\s*:\s*(\S+)/m);
-        push("provider-cfg", "Provider 已选择", m ? "ok" : "warn",
-          m ? `provider: ${m[1]}` : "config.yaml 中未发现 provider 字段");
-      } catch (e) { push("provider-cfg", "Provider 已选择", "error", String(e)); }
+        push("provider-cfg", t("diag.provider_selected"), m ? "ok" : "warn",
+          m ? `provider: ${m[1]}` : t("diag.provider_selected_warn"));
+      } catch (e) { push("provider-cfg", t("diag.provider_selected"), "error", String(e)); }
 
-      // 7) Dashboard 安全模式
+      // 7) Dashboard listen mode
       try {
         const insecure = process.env.HERMES_DASHBOARD_INSECURE !== "0";
-        push("dashboard-mode", "Dashboard 监听模式",
+        push("dashboard-mode", t("diag.dashboard_listen"),
           insecure ? "warn" : "ok",
-          insecure ? "外部访问模式（0.0.0.0），如需仅本地请到「高级」锁回" : "本地安全模式（127.0.0.1）");
-      } catch (e) { push("dashboard-mode", "Dashboard 监听模式", "error", String(e)); }
+          insecure ? t("diag.dashboard_external") : t("diag.dashboard_local"));
+      } catch (e) { push("dashboard-mode", t("diag.dashboard_listen"), "error", String(e)); }
 
-      // 8) ttyd 二进制
+      // 8) ttyd binary
       try {
         const ok = existsSync(TTYD_BIN);
-        push("ttyd", "ttyd 终端二进制", ok ? "ok" : "error",
-          ok ? TTYD_BIN : "未找到 ttyd，CLI 终端无法启动");
-      } catch (e) { push("ttyd", "ttyd 终端二进制", "error", String(e)); }
+        push("ttyd", t("diag.ttyd_bin"), ok ? "ok" : "error",
+          ok ? TTYD_BIN : t("diag.ttyd_bin_missing"));
+      } catch (e) { push("ttyd", t("diag.ttyd_bin"), "error", String(e)); }
 
       const summary = {
         ok: checks.filter(c => c.status === "ok").length,
         warn: checks.filter(c => c.status === "warn").length,
         error: checks.filter(c => c.status === "error").length,
       };
+
+      // v0.30: 异常时通过 broadcastLog 推前端 toast（携带 level=warn|error）
+      try {
+        if (summary.error > 0) {
+          broadcastLog("[diagnostics] " + t("alert.diag_error", { error: summary.error }), { level: "error", code: "DIAG_ERROR" });
+        } else if (summary.warn > 0) {
+          broadcastLog("[diagnostics] " + t("alert.diag_warn", { warn: summary.warn }), { level: "warn", code: "DIAG_WARN" });
+        }
+      } catch {}
+
       return json({ ok: true, summary, checks, time: new Date().toISOString() });
     }
 

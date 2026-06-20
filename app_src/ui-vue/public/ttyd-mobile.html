@@ -100,21 +100,32 @@
       background: #161b22;
       border-top: 1px solid #30363d;
     }
+    /* v0.30.2: 双排工具栏 — 行 1 特殊键、行 2 工具按钮 */
     .toolbar {
-      display: flex; gap: 8px;
-      padding: 8px 10px;
+      display: flex; flex-direction: column; gap: 6px;
+      padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+    }
+    .toolbar .row {
+      display: flex; gap: 6px;
       overflow-x: auto;
       -webkit-overflow-scrolling: touch;
       scrollbar-width: none;
     }
-    .toolbar::-webkit-scrollbar { display: none; }
+    .toolbar .row::-webkit-scrollbar { display: none; }
     .toolbar .btn {
       flex: 0 0 auto;
-      padding: 8px 10px;
+      padding: 6px 10px;
       font-size: 12px;
-      min-height: 34px;
+      min-height: 32px;
+      white-space: nowrap;
     }
     .toolbar .btn.key { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    /* 行 2 的工具按钮在小屏上稍突出一点 */
+    .toolbar .row.tools .btn {
+      background: #1f2937; border-color: #374151;
+    }
+    .toolbar .row.tools .btn#btn-find-url { background: #1f3a5f; border-color: #2563eb; }
+    .toolbar .row.tools .btn#btn-copy-screen { background: #1f3a2c; border-color: #16a34a; }
     #toast {
       position: fixed; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom));
       transform: translateX(-50%);
@@ -138,6 +149,40 @@
     }
     #debug.show { display: block; }
     .hidden { display: none !important; }
+
+    /* URL picker — 用于把 ttyd 屏幕里的链接列出来，便于点开/复制 */
+    #url-picker { position: fixed; inset: 0; z-index: 300; }
+    #url-picker.hidden { display: none !important; }
+    #url-picker .up-mask {
+      position: absolute; inset: 0; background: rgba(0,0,0,0.55);
+    }
+    #url-picker .up-card {
+      position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      width: min(92vw, 480px); max-height: 70vh; overflow: auto;
+      background: #161b22; color: #c9d1d9;
+      border: 1px solid #30363d; border-radius: 12px;
+      padding: 14px; box-shadow: 0 10px 40px rgba(0,0,0,.6);
+    }
+    #url-picker .up-title { font-size: 14px; font-weight: 600; margin-bottom: 10px; color: #58a6ff; }
+    #url-picker .up-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px; }
+    #url-picker .up-row {
+      display: flex; gap: 6px; align-items: center;
+      background: #0d1117; border: 1px solid #30363d; border-radius: 6px;
+      padding: 8px 10px;
+    }
+    #url-picker .up-row .url {
+      flex: 1; font-family: ui-monospace, SFMono-Regular, monospace;
+      font-size: 12px; word-break: break-all; color: #c9d1d9;
+      max-height: 64px; overflow: auto;
+    }
+    #url-picker .up-row .btn-mini {
+      background: #21262d; color: #c9d1d9; border: 1px solid #30363d;
+      border-radius: 4px; padding: 4px 8px; font-size: 11px; flex: 0 0 auto;
+    }
+    #url-picker .up-row .btn-mini.primary { background: #1f6feb; border-color: #1f6feb; color: #fff; }
+    #url-picker .up-close {
+      width: 100%; margin-top: 4px;
+    }
   </style>
 </head>
 <body>
@@ -166,16 +211,34 @@
     </div>
     <footer>
       <div class="toolbar">
-        <button class="btn key" data-seq="\u0003" data-copy="Ctrl+C">Ctrl+C</button>
-        <button class="btn key" data-seq="\t" data-copy="Tab">Tab</button>
-        <button class="btn key" data-seq="\u001b" data-copy="Esc">Esc</button>
-        <button class="btn key" data-seq="\u001b[A" data-copy="↑">↑</button>
-        <button class="btn key" data-seq="\u001b[B" data-copy="↓">↓</button>
-        <button class="btn key" data-seq="\u001b[D" data-copy="←">←</button>
-        <button class="btn key" data-seq="\u001b[C" data-copy="→">→</button>
-        <button class="btn" id="btn-paste">粘贴</button>
+        <!-- 行 1：特殊按键 -->
+        <div class="row keys">
+          <button class="btn key" data-seq="\u0003" data-copy="Ctrl+C">Ctrl+C</button>
+          <button class="btn key" data-seq="\t" data-copy="Tab">Tab</button>
+          <button class="btn key" data-seq="\u001b" data-copy="Esc">Esc</button>
+          <button class="btn key" data-seq="\u001b[A" data-copy="↑">↑</button>
+          <button class="btn key" data-seq="\u001b[B" data-copy="↓">↓</button>
+          <button class="btn key" data-seq="\u001b[D" data-copy="←">←</button>
+          <button class="btn key" data-seq="\u001b[C" data-copy="→">→</button>
+        </div>
+        <!-- 行 2：工具按钮 -->
+        <div class="row tools">
+          <button class="btn" id="btn-font" title="切换字体大小">A±</button>
+          <button class="btn" id="btn-copy-screen" title="复制全屏文本">📋 复制屏</button>
+          <button class="btn" id="btn-find-url" title="提取链接到剪贴板">🔗 链接</button>
+          <button class="btn" id="btn-paste">粘贴</button>
+        </div>
       </div>
     </footer>
+  </div>
+  <!-- 链接选择器：点 🔗 链接 时弹出，列出屏幕上识别到的所有 URL -->
+  <div id="url-picker" class="hidden">
+    <div class="up-mask"></div>
+    <div class="up-card">
+      <div class="up-title">检测到的链接</div>
+      <div class="up-list"></div>
+      <button class="btn up-close">关闭</button>
+    </div>
   </div>
   <div id="toast"></div>
   <div id="debug"></div>
@@ -383,6 +446,169 @@
           showToast(ok ? '已粘贴' : '剪贴板内容已复制，请手动粘贴');
         } catch (e) {
           showToast('无法读取剪贴板，请长按终端区域粘贴');
+        }
+      });
+
+      // ====== v0.31: 字体 / 复制屏 / 链接提取 ======
+
+      // 1. 字体大小循环：12 / 14 / 16 / 18 / 20 px，localStorage 持久化
+      const FONT_SIZES = [12, 14, 16, 18, 20];
+      const FONT_KEY = 'hermes-ttyd-font';
+      let fontIdx = (() => {
+        const saved = parseInt(localStorage.getItem(FONT_KEY) || '14', 10);
+        const i = FONT_SIZES.indexOf(saved);
+        return i >= 0 ? i : 1;
+      })();
+      function applyFont() {
+        const size = FONT_SIZES[fontIdx];
+        try {
+          const doc = frame.contentDocument;
+          if (!doc) return;
+          let st = doc.getElementById('hermes-font-style');
+          if (!st) {
+            st = doc.createElement('style');
+            st.id = 'hermes-font-style';
+            doc.head.appendChild(st);
+          }
+          st.textContent = '.xterm, .xterm-rows, .xterm-helper-textarea { font-size: ' + size + 'px !important; }';
+          window.dispatchEvent(new Event('resize'));
+          frame.contentWindow && frame.contentWindow.dispatchEvent(new Event('resize'));
+        } catch {}
+        localStorage.setItem(FONT_KEY, String(size));
+      }
+      document.getElementById('btn-font').addEventListener('click', () => {
+        fontIdx = (fontIdx + 1) % FONT_SIZES.length;
+        applyFont();
+        showToast('字体 ' + FONT_SIZES[fontIdx] + 'px');
+      });
+      frame.addEventListener('load', () => setTimeout(applyFont, 600));
+
+      // 2. 读取 ttyd iframe 内 xterm 全屏文本（包含滚动缓冲区）
+      function readScreenText() {
+        try {
+          const doc = frame.contentDocument;
+          if (!doc) return '';
+          // ttyd 用 xterm.js 渲染，每行是 .xterm-rows > div
+          const rows = doc.querySelectorAll('.xterm-rows > div');
+          if (!rows.length) {
+            // 兜底：直接取 body 文本
+            return (doc.body && doc.body.innerText) || '';
+          }
+          const lines = [];
+          rows.forEach((row) => {
+            // 用 textContent 而非 innerText，避免 xterm 的 hidden span 被忽略
+            const t = (row.textContent || '').replace(/\u00a0/g, ' ').trimEnd();
+            lines.push(t);
+          });
+          // 去除末尾空白行
+          while (lines.length && !lines[lines.length - 1]) lines.pop();
+          return lines.join('\n');
+        } catch (e) {
+          return '';
+        }
+      }
+
+      async function copyText(text) {
+        if (!text) return false;
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch {}
+        // 兜底：legacy execCommand
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = text;
+          ta.style.position = 'fixed'; ta.style.opacity = '0';
+          document.body.appendChild(ta);
+          ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          return ok;
+        } catch {
+          return false;
+        }
+      }
+
+      // 3. 复制全屏文本
+      document.getElementById('btn-copy-screen').addEventListener('click', async () => {
+        const text = readScreenText();
+        if (!text) {
+          showToast('暂未读到终端内容，请等终端就绪');
+          return;
+        }
+        const ok = await copyText(text);
+        showToast(ok ? '已复制 ' + text.split('\n').length + ' 行到剪贴板' : '复制失败，请检查浏览器权限');
+      });
+
+      // 4. 链接提取 — 屏幕里的所有 http/https/ws/file 链接
+      const URL_RE = /\bhttps?:\/\/[^\s'"<>`]+|\bwss?:\/\/[^\s'"<>`]+/gi;
+      function extractUrls(text) {
+        if (!text) return [];
+        const set = new Set();
+        const list = [];
+        const matches = text.match(URL_RE) || [];
+        for (let raw of matches) {
+          // 去掉行末标点
+          raw = raw.replace(/[.,;:!?)\]}"']+$/, '');
+          if (!set.has(raw)) {
+            set.add(raw);
+            list.push(raw);
+          }
+        }
+        return list;
+      }
+
+      const urlPicker = document.getElementById('url-picker');
+      const urlList = urlPicker.querySelector('.up-list');
+      urlPicker.querySelector('.up-mask').addEventListener('click', () => urlPicker.classList.add('hidden'));
+      urlPicker.querySelector('.up-close').addEventListener('click', () => urlPicker.classList.add('hidden'));
+
+      function showUrlPicker(urls) {
+        urlList.innerHTML = '';
+        if (!urls.length) {
+          const empty = document.createElement('div');
+          empty.style.color = '#8b949e'; empty.style.fontSize = '13px';
+          empty.textContent = '当前屏幕未识别到链接';
+          urlList.appendChild(empty);
+        } else {
+          urls.forEach((u) => {
+            const row = document.createElement('div');
+            row.className = 'up-row';
+            const span = document.createElement('div');
+            span.className = 'url'; span.textContent = u;
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn-mini'; copyBtn.textContent = '复制';
+            copyBtn.addEventListener('click', async () => {
+              const ok = await copyText(u);
+              showToast(ok ? '已复制' : '复制失败');
+            });
+            const openBtn = document.createElement('button');
+            openBtn.className = 'btn-mini primary'; openBtn.textContent = '打开';
+            openBtn.addEventListener('click', () => {
+              try {
+                window.open(u, '_blank', 'noopener');
+              } catch {
+                showToast('无法新开标签，请手动复制');
+              }
+            });
+            row.appendChild(span);
+            row.appendChild(copyBtn);
+            row.appendChild(openBtn);
+            urlList.appendChild(row);
+          });
+        }
+        urlPicker.classList.remove('hidden');
+      }
+
+      document.getElementById('btn-find-url').addEventListener('click', () => {
+        const text = readScreenText();
+        const urls = extractUrls(text);
+        showUrlPicker(urls);
+        if (urls.length === 1) {
+          // 只有一个链接时自动复制 —— 主人最常见的初始化场景
+          copyText(urls[0]).then((ok) => {
+            if (ok) showToast('已复制唯一链接，可点「打开」');
+          });
         }
       });
 
