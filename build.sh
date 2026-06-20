@@ -18,27 +18,28 @@ NC='\033[0m'
 
 echo "===== Hermes FPK 打包 ====="
 
+# v0.30.8: 版本号 SSOT 治理 — 从 manifest 同步派生位置 + preflight 门禁
+echo "[0a/6] 版本号 SSOT 同步 ..."
+python3 "$PROJ_DIR/scripts/sync-version.py" || {
+  echo -e "${RED}ERROR: 版本号同步失败${NC}"
+  exit 1
+}
+
+echo "[0b/6] AUDIT_REPORT 自动生成 ..."
+python3 "$PROJ_DIR/scripts/gen-audit.py" || echo -e "${YELLOW}  警告：AUDIT_REPORT 生成失败（非致命）${NC}"
+
+echo "[0c/6] preflight 一致性门禁 ..."
+bash "$PROJ_DIR/scripts/preflight.sh" || {
+  echo -e "${RED}ERROR: preflight 失败，请修复上述问题后重试${NC}"
+  exit 1
+}
+
 # 0. 把版本号写入构建元数据，避免真机运行时依赖 manifest 权限/路径
 echo "[0/6] 写入构建元数据 ..."
 echo "{\"version\":\"$VERSION\"}" > "$APP_SRC/server/modules/build-meta.json"
 
 # v0.30.5: 同步 manifest 版本到 package.json，避免漂移
-if [ -f "$PROJ_DIR/package.json" ]; then
-  python3 - "$PROJ_DIR/package.json" "$VERSION" <<'PY' || echo -e "${YELLOW}  警告：package.json 版本同步失败${NC}"
-import json, sys
-path, ver = sys.argv[1], sys.argv[2]
-with open(path, "r", encoding="utf-8") as f:
-    pkg = json.load(f)
-if pkg.get("version") != ver:
-    pkg["version"] = ver
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(pkg, f, indent=2, ensure_ascii=False)
-        f.write("\n")
-    print(f"  package.json version -> {ver}")
-else:
-    print(f"  package.json version already {ver}")
-PY
-fi
+# v0.30.8: 已统一由 scripts/sync-version.py 处理（步骤 0a），保留此段为 no-op 兼容旧脚本调用
 
 # 1. 准备 build 目录
 echo "[1/6] 准备 build 目录 ..."

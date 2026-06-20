@@ -30,7 +30,7 @@ else
 fi
 
 # 检查保留运行环境标记
-MARKER="${TRIM_PKGHOME}/.qwenpaw_keep_runtime"
+MARKER="${TRIM_PKGHOME}/.hermes_keep_runtime"
 if [ -f "${MARKER}" ]; then
     log_msg "detected keep-runtime marker, upgrade will preserve venv/data"
 fi

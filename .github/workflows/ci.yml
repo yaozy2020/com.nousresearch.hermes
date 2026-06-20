@@ -14,6 +14,22 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Setup Python (for governance scripts)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Preflight (version SSOT + repo hygiene)
+        run: |
+          chmod +x scripts/preflight.sh scripts/sync-version.py scripts/gen-audit.py
+          bash scripts/preflight.sh
+
+      - name: Verify AUDIT_REPORT.md is up-to-date
+        env:
+          AUDIT_NO_GIT: "1"
+        run: |
+          python3 scripts/gen-audit.py --check
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
