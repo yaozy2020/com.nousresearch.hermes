@@ -136,7 +136,22 @@ if [ ! -f "$APP_SRC/ui/index.html" ]; then
   exit 1
 fi
 
-# 3. 准备 fnpack 所需的 app 目录（server + ui + bin）
+# 2b. 预下载 hermes-agent wheel 到 fpk，作为离线安装兜底
+echo "[2b/6] 预下载 hermes-agent wheel（离线安装兜底）..."
+WHEELS_DIR="$PROJ_DIR/wheels"
+rm -rf "$WHEELS_DIR"
+mkdir -p "$WHEELS_DIR"
+# 使用系统 python3 下载纯 Python wheel（py3-none-any），兼容 python3.10/3.11/3.12
+if command -v python3 >/dev/null 2>&1; then
+  python3 -m pip download hermes-agent --no-deps -d "$WHEELS_DIR" -i https://pypi.org/simple 2>&1 | tail -5
+else
+  echo -e "${YELLOW}  警告：未找到 python3，跳过 wheel 预下载${NC}"
+fi
+if [ ! -f "$WHEELS_DIR"/*.whl ]; then
+  echo -e "${YELLOW}  警告：未成功下载 hermes-agent wheel，离线兜底将不可用${NC}"
+fi
+
+# 3. 准备 fnpack 所需的 app 目录（server + ui + bin + wheels）
 echo "[3/6] 准备 app 目录 ..."
 # 验证 ttyd 二进制存在
 if [ ! -x "$APP_SRC/bin/ttyd" ]; then
@@ -150,6 +165,8 @@ mkdir -p "$APP_DIR"
 cp -a "$APP_SRC/server" "$APP_DIR/"
 cp -a "$APP_SRC/ui" "$APP_DIR/"
 cp -a "$APP_SRC/bin" "$APP_DIR/"
+# 复制预下载的 wheels，install.js 会优先使用本地 wheel 离线安装
+cp -a "$WHEELS_DIR" "$APP_DIR/"
 
 # fnOS service 启动 bun 1.3.9 时会把 utf-8 源文件按 latin-1 解码（同一个 bun
 # 二进制用 hermes 用户跑就 9 个 char，用其他用户跑就正常 3 个 char，env

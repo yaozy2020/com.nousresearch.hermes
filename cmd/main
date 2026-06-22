@@ -52,6 +52,7 @@ export HERMES_VENV="${HERMES_VENV}"
 export HERMES_BIN="${HERMES_BIN}"
 export HERMES_PANEL_BIN="${HERMES_PANEL_BIN}"
 export HERMES_DASHBOARD_PORT="${HERMES_DASHBOARD_PORT:-9119}"
+export HERMES_BUNDLED_WHEELS="${TRIM_APPDEST}/wheels"
 
 log_msg() {
     echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" >> ${LOG_FILE}
