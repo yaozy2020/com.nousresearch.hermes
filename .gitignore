@@ -27,6 +27,7 @@ app_src/ui-vue/package-lock.json
 *.log
 *.tmp
 .DS_Store
+tmp/
 
 # 编辑器
 *.swp

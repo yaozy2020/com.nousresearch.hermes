@@ -30,7 +30,7 @@
   <div id="app" class="isolate"></div>
   <script type="module" src="/src/main.ts"></script>
   <script>
-    // v0.32.0: Hermes 升级入口 widget
+    // v0.32.0: Hermes 升级入口 widget（紧凑样式）
     (function () {
       const meta = document.querySelector('meta[name="hermes-api-base"]');
       const base = (meta ? meta.getAttribute('content') : '/').replace(/\/$/, '') || '';
@@ -62,35 +62,37 @@
       let checkInProgress = false;
       let upgradeTarget = null;
 
-      async function checkVersion(btn, statusEl) {
+      async function checkVersion(btnWrap) {
         if (checkInProgress) return;
         checkInProgress = true;
+        const statusEl = btnWrap.querySelector('.hup-status');
+        const btn = btnWrap.querySelector('button');
         btn.disabled = true;
-        btn.textContent = '检查中…';
-        statusEl.textContent = '正在连接 PyPI…';
+        btn.textContent = '检查中';
+        statusEl.textContent = '连接 PyPI…';
         try {
           const data = await fetchJson('api/hermes/versions');
           if (!data.ok) throw new Error(data.error || '检查失败');
           if (!data.installed) {
-            statusEl.textContent = '未安装';
+            statusEl.textContent = '未安装 hermes-agent';
             btn.textContent = '检查更新';
             btn.disabled = false;
             return;
           }
           if (data.hasUpdate) {
             upgradeTarget = data.latest;
-            statusEl.innerHTML = '当前 <b>' + data.installed + '</b> · 最新 <b class="text-success">' + data.latest + '</b>';
-            btn.textContent = '升级到 ' + data.latest;
+            statusEl.innerHTML = '新版本 <b>' + data.latest + '</b>';
+            btn.textContent = '升级';
             btn.disabled = false;
             btn.dataset.action = 'upgrade';
           } else {
-            statusEl.innerHTML = '当前 <b>' + data.installed + '</b> · 已是最新';
+            statusEl.textContent = '已是最新';
             btn.textContent = '检查更新';
             btn.disabled = false;
             btn.dataset.action = 'check';
           }
         } catch (err) {
-          statusEl.textContent = '检查失败: ' + (err && err.message ? err.message : String(err));
+          statusEl.textContent = '检查失败';
           btn.textContent = '重试';
           btn.disabled = false;
         } finally {
@@ -98,11 +100,14 @@
         }
       }
 
-      async function doUpgrade(btn, statusEl, logEl) {
+      async function doUpgrade(btnWrap) {
         if (!confirm('确定升级到 hermes-agent ' + upgradeTarget + '？\n升级前会自动备份数据目录，失败可回滚。')) return;
+        const statusEl = btnWrap.querySelector('.hup-status');
+        const btn = btnWrap.querySelector('button');
+        const logEl = btnWrap.querySelector('.hup-log');
         btn.disabled = true;
-        btn.textContent = '升级中…';
-        statusEl.textContent = '升级已启动…';
+        btn.textContent = '升级中';
+        statusEl.textContent = '已启动…';
         logEl.style.display = 'block';
         logEl.textContent = '';
         try {
@@ -126,10 +131,10 @@
                 clearInterval(poll);
                 const final = await fetchJson('api/hermes/versions');
                 if (final.ok && final.installed === upgradeTarget) {
-                  statusEl.innerHTML = '已升级到 <b class="text-success">' + final.installed + '</b>';
+                  statusEl.textContent = '已升级';
                   toast('升级成功', 'success');
                 } else {
-                  statusEl.textContent = '升级可能失败，请查看日志';
+                  statusEl.textContent = '升级失败';
                   toast('升级失败，请查看日志', 'error');
                 }
                 btn.textContent = '检查更新';
@@ -142,7 +147,7 @@
             }
           }, 1500);
         } catch (err) {
-          statusEl.textContent = '升级失败: ' + (err && err.message ? err.message : String(err));
+          statusEl.textContent = '升级失败';
           btn.textContent = '重试';
           btn.disabled = false;
           toast('升级失败', 'error');
@@ -151,49 +156,47 @@
 
       function inject(card) {
         if (card.querySelector('.hermes-upgrade-injected')) return;
-        const box = document.createElement('div');
-        box.className = 'hermes-upgrade-injected';
-        box.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid var(--ui-border);';
+        const wrap = document.createElement('div');
+        wrap.className = 'hermes-upgrade-injected';
+        wrap.style.cssText = 'margin-top:10px;padding-top:10px;border-top:1px solid var(--ui-border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;';
 
-        const row = document.createElement('div');
-        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
-
-        const status = document.createElement('div');
-        status.style.cssText = 'font-size:13px;color:var(--ui-text-muted);';
-        status.textContent = '点击检查最新版本';
+        const status = document.createElement('span');
+        status.className = 'hup-status';
+        status.style.cssText = 'font-size:12px;color:var(--ui-text-muted);';
+        status.textContent = '点击检查更新';
 
         const btn = document.createElement('button');
         btn.textContent = '检查更新';
-        btn.style.cssText = 'font-size:13px;padding:6px 12px;border-radius:6px;border:none;background:var(--ui-primary);color:#fff;cursor:pointer;';
-        btn.disabled = false;
         btn.dataset.action = 'check';
+        btn.style.cssText = 'font-size:12px;padding:3px 10px;border-radius:6px;border:1px solid var(--ui-border);background:var(--ui-bg-elevated);color:var(--ui-text);cursor:pointer;transition:opacity .15s;';
 
         const log = document.createElement('pre');
-        log.style.cssText = 'display:none;margin-top:10px;padding:10px;background:var(--ui-bg-elevated);border:1px solid var(--ui-border);border-radius:6px;font-size:11px;font-family:monospace;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all;color:var(--ui-text);';
+        log.className = 'hup-log';
+        log.style.cssText = 'display:none;flex-basis:100%;margin-top:8px;padding:8px;background:var(--ui-bg-elevated);border:1px solid var(--ui-border);border-radius:6px;font-size:11px;font-family:monospace;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all;color:var(--ui-text);';
 
         btn.addEventListener('click', function () {
           if (btn.dataset.action === 'upgrade') {
-            doUpgrade(btn, status, log);
+            doUpgrade(wrap);
           } else {
-            checkVersion(btn, status);
+            checkVersion(wrap);
           }
         });
 
-        row.appendChild(status);
-        row.appendChild(btn);
-        box.appendChild(row);
-        box.appendChild(log);
-        card.appendChild(box);
+        wrap.appendChild(status);
+        wrap.appendChild(btn);
+        wrap.appendChild(log);
+        card.appendChild(wrap);
 
-        checkVersion(btn, status);
+        checkVersion(wrap);
       }
 
       function findVersionCard() {
-        const headings = Array.from(document.querySelectorAll('span, h2, h3'));
+        const headings = Array.from(document.querySelectorAll('span, h2, h3, div'));
         for (let i = 0; i < headings.length; i++) {
           const h = headings[i];
-          if (h.textContent.trim() === '版本信息') {
-            let card = h.closest('[class*="bg-"], [class*="card"], .rounded');
+          // 图标和文字可能混在一起，用 includes 匹配
+          if (h.textContent && h.textContent.includes('版本信息')) {
+            let card = h.closest('[class*="bg-"], [class*="card"], .rounded, [class*="rounded"]');
             if (card) return card;
           }
         }

@@ -1,6 +1,7 @@
 // hermes/upgrade.js
 // hermes-agent 版本检测、升级、备份与回滚
 import { existsSync, mkdirSync, cpSync, rmSync } from "fs";
+import { spawn } from "child_process";
 import { broadcastLog } from "../logger.js";
 import { swallowError } from "../error.js";
 import { DATA_DIR, HERMES_BIN } from "./paths.js";
@@ -28,15 +29,26 @@ export function clearUpgradeLogs() {
   upgradeLogs = [];
 }
 
-// 获取当前已安装的 hermes-agent 版本
+// 标准化版本号：去掉 v 前缀、trim、转小写
+function normalizeVersion(v) {
+  if (!v) return v;
+  return String(v).trim().replace(/^v/i, "").toLowerCase();
+}
+
+// 获取当前已安装的 hermes-agent 版本（已标准化）
 export async function getInstalledVersion() {
   if (!existsSync(HERMES_BIN)) return { installed: false, version: null };
   try {
-    const proc = Bun.spawn([HERMES_BIN, "--version"], { stdout: "pipe", stderr: "pipe" });
-    const exitCode = await proc.exited;
-    if (exitCode !== 0) return { installed: true, version: null, error: "hermes --version failed" };
-    const version = new TextDecoder().decode(await Bun.readableStreamToArrayBuffer(proc.stdout)).trim();
-    return { installed: true, version };
+    const proc = spawn(HERMES_BIN, ["--version"], { stdout: "pipe", stderr: "pipe" });
+    let stdout = "";
+    let stderr = "";
+    proc.stdout.on("data", (chunk) => { stdout += chunk.toString(); });
+    proc.stderr.on("data", (chunk) => { stderr += chunk.toString(); });
+    const exitCode = await new Promise((resolve) => proc.on("close", resolve));
+    if (exitCode !== 0) return { installed: true, version: null, error: stderr || "hermes --version failed" };
+    const raw = stdout.trim();
+    const version = normalizeVersion(raw);
+    return { installed: true, version, raw };
   } catch (err) {
     return { installed: true, version: null, error: String(err) };
   }
@@ -105,12 +117,13 @@ export async function upgradeHermes(targetVersion = null) {
       log(`[upgrade] Latest version: ${target}\n`);
     }
 
-    if (current.version === target) {
+    const normalizedTarget = normalizeVersion(target);
+    if (current.version === normalizedTarget) {
       upgradeInProgress = false;
-      return { ok: true, message: "Already up to date", current: current.version, target };
+      return { ok: true, message: "Already up to date", current: current.version, target: normalizedTarget };
     }
 
-    const packageSpec = `hermes-agent==${target}`;
+    const packageSpec = `hermes-agent==${normalizedTarget}`;
     const validation = validatePackageSpec(packageSpec);
     if (!validation.ok) {
       upgradeInProgress = false;

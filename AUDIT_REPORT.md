@@ -3,10 +3,10 @@
 > ⚠️ 本文件由 `scripts/gen-audit.py` 自动生成，请勿手工编辑。
 > 数据源：manifest / tests / cmd / server modules / git tags。
 
-## 当前版本：v0.32.0
+## 当前版本：v0.32.1
 
-- **生成时间**：2026-06-22 18:36:43 +0800
-- **测试用例**：136 个 / 16 个文件
+- **生成时间**：2026-06-22 18:46:07 +0800
+- **测试用例**：140 个 / 17 个文件
 - **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
 - **后端模块**：17 个
 - **CI Workflow**：ci.yml, release.yml
@@ -64,6 +64,7 @@
 
 | 版本 | 发布日期 |
 |:-----|:----:|
+| `v0.32.0` | 2026-06-22 |
 | `v0.31.3` | 2026-06-22 |
 
 ## 待持续推进项
