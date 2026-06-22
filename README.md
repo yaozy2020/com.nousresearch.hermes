@@ -1,6 +1,6 @@
 # Hermes for fnOS
 
-[![Version](https://img.shields.io/badge/version-0.31.3-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.31.3)
+[![Version](https://img.shields.io/badge/version-0.32.0-blue)](https://github.com/yaozy2020/com.nousresearch.hermes/releases/tag/v0.32.0)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 [![fnOS](https://img.shields.io/badge/fnOS-%E2%89%A5%201.1.3107-orange)](https://www.fnnas.com/)
 
@@ -110,7 +110,7 @@ bash build.sh
 
 ## 版本历史
 
-### v0.31.3（当前版本）
+### v0.32.0（当前版本）
 
 `hermes.js` 重构 + 子模块化 + 图标圆角修正，**无功能变更**，纯结构 + UI 优化。
 

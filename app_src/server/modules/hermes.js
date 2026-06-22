@@ -7,6 +7,7 @@
 //   - hermes/gateway.js        Gateway 进程生命周期
 //   - hermes/dashboard.js      Dashboard 进程生命周期
 //   - hermes/install.js        pip 安装 / 包名校验 / 整体重启
+//   - hermes/upgrade.js        hermes-agent 版本检测 / 升级 / 回滚
 
 export { initHermesModule } from "./hermes/proc-utils.js";
 export { getDashboardPort, getDashboardInsecure } from "./hermes/dashboard-env.js";
@@ -30,3 +31,11 @@ export {
   installHermes,
   restartHermesAll,
 } from "./hermes/install.js";
+export {
+  isUpgradeInProgress,
+  getInstalledVersion,
+  getLatestVersion,
+  getUpgradeLogs,
+  clearUpgradeLogs,
+  upgradeHermes,
+} from "./hermes/upgrade.js";

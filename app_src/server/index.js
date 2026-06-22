@@ -30,7 +30,8 @@ import {
   isGatewayRunning, getGatewayPid, startGateway, stopGateway, getGatewayUptime,
   isDashboardRunning, getDashboardPid, startDashboard, stopDashboard, getDashboardUptime,
   installHermes, restartHermesAll, isInstallInProgress, validatePackageSpec, initHermesModule,
-  getDashboardPort, getDashboardInsecure
+  getDashboardPort, getDashboardInsecure,
+  isUpgradeInProgress, getInstalledVersion, getLatestVersion, upgradeHermes, getUpgradeLogs
 } from "./modules/hermes.js";
 import { isTtydAlive, getTtydPid, getTtydPort, getTtydUptime, startTtyd, stopTtyd, getTtydTargetUrl, TERM_COMMANDS } from "./modules/terminal.js";
 
@@ -467,6 +468,34 @@ async function handleRequest(req) {
       }
       const result = await installHermes(packageSpec);
       return json(result, result.ok ? 200 : 500);
+    }
+    // v0.32.0: hermes-agent 升级相关 API
+    if (pathname === "/api/hermes/versions" && method === "GET") {
+      const installed = await getInstalledVersion();
+      const latest = await getLatestVersion();
+      return json({
+        ok: true,
+        installed: installed.version,
+        latest: latest.ok ? latest.version : null,
+        hasUpdate: !!(installed.version && latest.ok && installed.version !== latest.version),
+        latestError: latest.ok ? null : latest.error,
+      });
+    }
+    if (pathname === "/api/hermes/upgrade" && method === "POST") {
+      if (isUpgradeInProgress()) return json({ ok: false, error: "Upgrade already in progress" }, 409);
+      if (isInstallInProgress()) return json({ ok: false, error: "Installation already in progress" }, 409);
+      const body = await safeParseBody(req);
+      if (body instanceof Response) return body;
+      const target = body && body.target ? String(body.target) : null;
+      // 后台执行升级，前端通过 upgrade-in-progress / upgrade-logs 轮询状态
+      upgradeHermes(target).catch((err) => log("error", "upgrade background error", err));
+      return json({ ok: true, message: "Upgrade started" });
+    }
+    if (pathname === "/api/hermes/upgrade-in-progress" && method === "GET") {
+      return json({ ok: true, inProgress: isUpgradeInProgress() });
+    }
+    if (pathname === "/api/hermes/upgrade-logs" && method === "GET") {
+      return json({ ok: true, logs: getUpgradeLogs(), inProgress: isUpgradeInProgress() });
     }
     if (pathname === "/api/dashboard/status" && method === "GET") {
       return json({ running: isDashboardRunning(), pid: getDashboardPid(), uptime: getDashboardUptime(), port: getDashboardPort(), insecure: getDashboardInsecure() });

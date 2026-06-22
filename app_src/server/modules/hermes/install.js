@@ -110,9 +110,10 @@ function findBundledWheelsDir() {
   return null;
 }
 
-export async function installHermes(packageSpec) {
+export async function installHermes(packageSpec, options = {}) {
   if (installInProgress) return { ok: false, error: "Installation already in progress" };
-  if (existsSync(HERMES_BIN)) return { ok: true, message: "already installed", bin: HERMES_BIN };
+  const force = options.force === true;
+  if (!force && existsSync(HERMES_BIN)) return { ok: true, message: "already installed", bin: HERMES_BIN };
 
   const resolvedSpec = packageSpec || DEFAULT_PACKAGE_SPEC;
   const validation = validatePackageSpec(resolvedSpec);
@@ -121,7 +122,8 @@ export async function installHermes(packageSpec) {
   }
 
   installInProgress = true;
-  broadcastLog("[install] Starting Hermes installation ...\n");
+  const logPrefix = force ? "[upgrade]" : "[install]";
+  broadcastLog(`${logPrefix} Starting Hermes ${force ? "upgrade" : "installation"} ...\n`);
   try {
     let pythonBin = null;
     for (const py of ["python3.12", "python3.11", "python3.10", "python3"]) {
@@ -134,28 +136,28 @@ export async function installHermes(packageSpec) {
       }
     }
     if (!pythonBin) { installInProgress = false; return { ok: false, error: "Python 3.10+ not found" }; }
-    broadcastLog(`[install] Using ${pythonBin}\n`);
+    broadcastLog(`${logPrefix} Using ${pythonBin}\n`);
     if (!existsSync(`${VENV_DIR}/bin/python`)) {
-      broadcastLog("[install] Creating virtualenv ...\n");
+      broadcastLog(`${logPrefix} Creating virtualenv ...\n`);
       const venvProc = Bun.spawn([pythonBin, "-m", "venv", VENV_DIR], { stdout: "pipe", stderr: "pipe" });
       await venvProc.exited;
     }
     const pip = `${VENV_DIR}/bin/pip`;
 
-    broadcastLog("[install] Upgrading pip ...\n");
+    broadcastLog(`${logPrefix} Upgrading pip ...\n`);
     const upgradeProc = Bun.spawn([pip, "install", "--upgrade", "pip", "wheel", "setuptools", "-q"], { stdout: "pipe", stderr: "pipe" });
     await upgradeProc.exited;
 
     // 1) 优先使用 fpk 内置 wheels 离线安装（彻底兜底）
     const bundledWheelsDir = findBundledWheelsDir();
     if (bundledWheelsDir) {
-      broadcastLog(`[install] Found bundled wheels at ${bundledWheelsDir}, trying offline install ...\n`);
+      broadcastLog(`${logPrefix} Found bundled wheels at ${bundledWheelsDir}, trying offline install ...\n`);
       const offlineProc = Bun.spawn([pip, "install", resolvedSpec, "--no-index", "--find-links", bundledWheelsDir, "-q"], { stdout: "pipe", stderr: "pipe" });
       const offlineExit = await offlineProc.exited;
       if (offlineExit === 0) {
-        broadcastLog("[install] ✓ Offline install from bundled wheels succeeded.\n");
+        broadcastLog(`${logPrefix} ✓ Offline install from bundled wheels succeeded.\n`);
       } else {
-        broadcastLog("[install] ⚠️ Bundled wheels install failed, falling back to online mirrors ...\n");
+        broadcastLog(`${logPrefix} ⚠️ Bundled wheels install failed, falling back to online mirrors ...\n`);
       }
     }
 
@@ -166,7 +168,7 @@ export async function installHermes(packageSpec) {
       for (let i = 0; i < indexCandidates.length; i++) {
         const indexUrl = indexCandidates[i];
         const pipIndexArgs = getPipIndexArgs(indexUrl);
-        broadcastLog(`[install] Trying pip index [${i + 1}/${indexCandidates.length}]: ${indexUrl} ...\n`);
+        broadcastLog(`${logPrefix} Trying pip index [${i + 1}/${indexCandidates.length}]: ${indexUrl} ...\n`);
         const installProc = Bun.spawn([pip, "install", resolvedSpec, "-q", ...pipIndexArgs], { stdout: "pipe", stderr: "pipe" });
         (async () => {
           const reader = installProc.stderr.getReader();
@@ -182,29 +184,29 @@ export async function installHermes(packageSpec) {
         })();
         const exitCode = await installProc.exited;
         if (exitCode === 0) {
-          broadcastLog(`[install] ✓ Install succeeded from ${indexUrl}\n`);
+          broadcastLog(`${logPrefix} ✓ Install succeeded from ${indexUrl}\n`);
           break;
         }
         lastError = `pip install failed (exit ${exitCode}) from ${indexUrl}`;
-        broadcastLog(`[install] ❌ ${lastError}\n`);
+        broadcastLog(`${logPrefix} ❌ ${lastError}\n`);
       }
 
       // 3) 所有 PyPI 源都失败， fallback 到 GitHub（默认启用，除非显式禁用）
       if (!existsSync(HERMES_BIN)) {
         const noFallback = process.env.HERMES_NO_FALLBACK === "1";
         if (noFallback) {
-          broadcastLog("[install] ❌ All PyPI mirrors failed. GitHub fallback disabled by HERMES_NO_FALLBACK=1.\n");
+          broadcastLog(`${logPrefix} ❌ All PyPI mirrors failed. GitHub fallback disabled by HERMES_NO_FALLBACK=1.\n`);
           installInProgress = false;
           return { ok: false, error: "pip install failed on all configured indexes. Fallback disabled." };
         }
-        broadcastLog(`[install] ⚠️ All PyPI mirrors failed. Falling back to GitHub: ${OFFICIAL_GIT_SPEC}\n`);
+        broadcastLog(`${logPrefix} ⚠️ All PyPI mirrors failed. Falling back to GitHub: ${OFFICIAL_GIT_SPEC}\n`);
         const ghProc = Bun.spawn([pip, "install", OFFICIAL_GIT_SPEC, "-q"], { stdout: "pipe", stderr: "pipe" });
         const ghExit = await ghProc.exited;
         if (ghExit !== 0) {
           installInProgress = false;
           return { ok: false, error: `pip install failed on all indexes and GitHub fallback (github exit ${ghExit})` };
         }
-        broadcastLog("[install] ✓ GitHub fallback succeeded.\n");
+        broadcastLog(`${logPrefix} ✓ GitHub fallback succeeded.\n`);
       }
     }
 
@@ -212,9 +214,9 @@ export async function installHermes(packageSpec) {
     try { chmodSync(HERMES_BIN, 0o755); } catch (err) {
       swallowError("chmod hermes binary", err);
     }
-    broadcastLog("[install] Hermes installed successfully.\n");
+    broadcastLog(`${logPrefix} Hermes ${force ? "upgraded" : "installed"} successfully.\n`);
     installInProgress = false;
-    return { ok: true, message: "installed", bin: HERMES_BIN };
+    return { ok: true, message: force ? "upgraded" : "installed", bin: HERMES_BIN };
   } catch (err) {
     installInProgress = false;
     return { ok: false, error: String(err) };

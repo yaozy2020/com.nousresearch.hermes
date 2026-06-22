@@ -29,6 +29,192 @@
 <body>
   <div id="app" class="isolate"></div>
   <script type="module" src="/src/main.ts"></script>
+  <script>
+    // v0.32.0: Hermes 升级入口 widget
+    (function () {
+      const meta = document.querySelector('meta[name="hermes-api-base"]');
+      const base = (meta ? meta.getAttribute('content') : '/').replace(/\/$/, '') || '';
+      const api = (path) => base + '/' + path.replace(/^\//, '');
+
+      async function fetchJson(path, opts) {
+        const res = await fetch(api(path), opts);
+        if (!res.ok) throw new Error(res.status + ' ' + res.statusText);
+        return res.json();
+      }
+
+      function toast(msg, type) {
+        type = type || 'info';
+        let box = document.getElementById('hermes-upgrade-toast');
+        if (!box) {
+          box = document.createElement('div');
+          box.id = 'hermes-upgrade-toast';
+          box.style.cssText = 'position:fixed;top:16px;right:16px;z-index:9999;display:flex;flex-direction:column;gap:8px;max-width:320px;font-family:system-ui,-apple-system,sans-serif;';
+          document.body.appendChild(box);
+        }
+        const el = document.createElement('div');
+        const color = type === 'error' ? '#ef4444' : type === 'success' ? '#22c55e' : type === 'warning' ? '#f59e0b' : '#3b82f6';
+        el.style.cssText = 'background:' + color + ';color:#fff;padding:10px 14px;border-radius:8px;box-shadow:0 4px 12px rgba(0,0,0,0.15);font-size:13px;line-height:1.4;word-break:break-word;';
+        el.textContent = msg;
+        box.appendChild(el);
+        setTimeout(function () { el.remove(); }, 4000);
+      }
+
+      let checkInProgress = false;
+      let upgradeTarget = null;
+
+      async function checkVersion(btn, statusEl) {
+        if (checkInProgress) return;
+        checkInProgress = true;
+        btn.disabled = true;
+        btn.textContent = '检查中…';
+        statusEl.textContent = '正在连接 PyPI…';
+        try {
+          const data = await fetchJson('api/hermes/versions');
+          if (!data.ok) throw new Error(data.error || '检查失败');
+          if (!data.installed) {
+            statusEl.textContent = '未安装';
+            btn.textContent = '检查更新';
+            btn.disabled = false;
+            return;
+          }
+          if (data.hasUpdate) {
+            upgradeTarget = data.latest;
+            statusEl.innerHTML = '当前 <b>' + data.installed + '</b> · 最新 <b class="text-success">' + data.latest + '</b>';
+            btn.textContent = '升级到 ' + data.latest;
+            btn.disabled = false;
+            btn.dataset.action = 'upgrade';
+          } else {
+            statusEl.innerHTML = '当前 <b>' + data.installed + '</b> · 已是最新';
+            btn.textContent = '检查更新';
+            btn.disabled = false;
+            btn.dataset.action = 'check';
+          }
+        } catch (err) {
+          statusEl.textContent = '检查失败: ' + (err && err.message ? err.message : String(err));
+          btn.textContent = '重试';
+          btn.disabled = false;
+        } finally {
+          checkInProgress = false;
+        }
+      }
+
+      async function doUpgrade(btn, statusEl, logEl) {
+        if (!confirm('确定升级到 hermes-agent ' + upgradeTarget + '？\n升级前会自动备份数据目录，失败可回滚。')) return;
+        btn.disabled = true;
+        btn.textContent = '升级中…';
+        statusEl.textContent = '升级已启动…';
+        logEl.style.display = 'block';
+        logEl.textContent = '';
+        try {
+          const start = await fetchJson('api/hermes/upgrade', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(upgradeTarget ? { target: upgradeTarget } : {})
+          });
+          if (!start.ok) throw new Error(start.error || '启动升级失败');
+          toast('升级已启动，请等待…', 'info');
+
+          const poll = setInterval(async function () {
+            try {
+              const [prog, logs] = await Promise.all([
+                fetchJson('api/hermes/upgrade-in-progress'),
+                fetchJson('api/hermes/upgrade-logs')
+              ]);
+              logEl.textContent = (logs.logs || []).slice(-40).join('');
+              logEl.scrollTop = logEl.scrollHeight;
+              if (!prog.inProgress) {
+                clearInterval(poll);
+                const final = await fetchJson('api/hermes/versions');
+                if (final.ok && final.installed === upgradeTarget) {
+                  statusEl.innerHTML = '已升级到 <b class="text-success">' + final.installed + '</b>';
+                  toast('升级成功', 'success');
+                } else {
+                  statusEl.textContent = '升级可能失败，请查看日志';
+                  toast('升级失败，请查看日志', 'error');
+                }
+                btn.textContent = '检查更新';
+                btn.disabled = false;
+                btn.dataset.action = 'check';
+                upgradeTarget = null;
+              }
+            } catch (err) {
+              console.error('upgrade poll error', err);
+            }
+          }, 1500);
+        } catch (err) {
+          statusEl.textContent = '升级失败: ' + (err && err.message ? err.message : String(err));
+          btn.textContent = '重试';
+          btn.disabled = false;
+          toast('升级失败', 'error');
+        }
+      }
+
+      function inject(card) {
+        if (card.querySelector('.hermes-upgrade-injected')) return;
+        const box = document.createElement('div');
+        box.className = 'hermes-upgrade-injected';
+        box.style.cssText = 'margin-top:12px;padding-top:12px;border-top:1px solid var(--ui-border);';
+
+        const row = document.createElement('div');
+        row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;';
+
+        const status = document.createElement('div');
+        status.style.cssText = 'font-size:13px;color:var(--ui-text-muted);';
+        status.textContent = '点击检查最新版本';
+
+        const btn = document.createElement('button');
+        btn.textContent = '检查更新';
+        btn.style.cssText = 'font-size:13px;padding:6px 12px;border-radius:6px;border:none;background:var(--ui-primary);color:#fff;cursor:pointer;';
+        btn.disabled = false;
+        btn.dataset.action = 'check';
+
+        const log = document.createElement('pre');
+        log.style.cssText = 'display:none;margin-top:10px;padding:10px;background:var(--ui-bg-elevated);border:1px solid var(--ui-border);border-radius:6px;font-size:11px;font-family:monospace;max-height:200px;overflow:auto;white-space:pre-wrap;word-break:break-all;color:var(--ui-text);';
+
+        btn.addEventListener('click', function () {
+          if (btn.dataset.action === 'upgrade') {
+            doUpgrade(btn, status, log);
+          } else {
+            checkVersion(btn, status);
+          }
+        });
+
+        row.appendChild(status);
+        row.appendChild(btn);
+        box.appendChild(row);
+        box.appendChild(log);
+        card.appendChild(box);
+
+        checkVersion(btn, status);
+      }
+
+      function findVersionCard() {
+        const headings = Array.from(document.querySelectorAll('span, h2, h3'));
+        for (let i = 0; i < headings.length; i++) {
+          const h = headings[i];
+          if (h.textContent.trim() === '版本信息') {
+            let card = h.closest('[class*="bg-"], [class*="card"], .rounded');
+            if (card) return card;
+          }
+        }
+        return null;
+      }
+
+      const observer = new MutationObserver(function () {
+        const card = findVersionCard();
+        if (card) inject(card);
+      });
+
+      function boot() {
+        if (!document.body) return setTimeout(boot, 50);
+        observer.observe(document.body, { childList: true, subtree: true });
+        const card = findVersionCard();
+        if (card) inject(card);
+      }
+
+      boot();
+    })();
+  </script>
 </body>
 
 </html>
