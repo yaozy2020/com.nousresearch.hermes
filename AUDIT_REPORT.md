@@ -5,7 +5,7 @@
 
 ## 当前版本：v0.32.3
 
-- **生成时间**：2026-06-25 14:30:27 +0800
+- **生成时间**：2026-06-25 14:35:54 +0800
 - **测试用例**：140 个 / 17 个文件
 - **生命周期脚本**：9 个（config_callback, config_init, install_callback, install_init, main, uninstall_callback, uninstall_init, upgrade_callback, upgrade_init）
 - **后端模块**：17 个
