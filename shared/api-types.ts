@@ -51,6 +51,34 @@ export interface HermesInstallStatus {
   bin: string;
 }
 
+export interface VersionsResponse {
+  ok?: boolean;
+  installed: boolean;
+  current: string | null;
+  currentRaw?: string;
+  latest: string | null;
+  releaseUrl?: string | null;
+  hasUpdate: boolean;
+  error?: string | null;
+}
+
+export interface UpgradeStartResponse {
+  ok: boolean;
+  message?: string;
+  error?: string;
+  currentVersion?: string;
+  raw?: string;
+  backupPath?: string;
+}
+
+export interface UpgradeProgressResponse {
+  inProgress: boolean;
+}
+
+export interface UpgradeLogsResponse {
+  logs: string[];
+}
+
 export interface OperationResult {
   ok: boolean;
   message?: string;

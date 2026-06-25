@@ -38,6 +38,11 @@ export const navigationConfig: NavigationConfig = {
         to: '/config',
       },
       {
+        label: '备份管理',
+        icon: 'i-lucide-database-backup',
+        to: '/backups',
+      },
+      {
         label: '消息频道',
         icon: 'i-lucide-message-square',
         to: '/channels',
@@ -79,6 +84,11 @@ export const navigationConfig: NavigationConfig = {
       label: '更多',
       icon: 'i-lucide-menu',
       children: [
+        {
+          label: '备份管理',
+          icon: 'i-lucide-database-backup',
+          to: '/backups',
+        },
         {
           label: '消息频道',
           icon: 'i-lucide-message-square',

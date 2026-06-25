@@ -17,7 +17,7 @@
         "type": "switch",
         "field": "wizard_keep_runtime",
         "label": "保留运行环境",
-        "initValue": "false",
+        "initValue": "true",
         "helpText": "如果勾选，将保留 venv、runtime、state、logs 等运行数据。默认不勾选，重装后会重新初始化。"
       },
       {
@@ -30,14 +30,9 @@
       {
         "type": "switch",
         "field": "wizard_confirm_uninstall",
-        "label": "我已了解风险，确认卸载",
+        "label": "我了解风险，确认卸载",
         "initValue": "false",
-        "rules": [
-          {
-            "required": true,
-            "message": "请确认卸载操作"
-          }
-        ]
+        "helpText": "卸载后应用文件和数据将被删除，请确认已备份重要数据。"
       }
     ]
   }

@@ -45,6 +45,20 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/backup/': RouteRecordInfo<
+      '/backup/',
+      '/backup',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/backups/': RouteRecordInfo<
+      '/backups/',
+      '/backups',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
     '/channels/': RouteRecordInfo<
       '/channels/',
       '/channels',
@@ -104,6 +118,22 @@ declare module 'vue-router/auto-routes' {
     'src/pages/about/index.vue': {
       routes:
         | '/about/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/backup/index.vue': {
+      routes:
+        | '/backup/'
+      views:
+        | never
+      pathParamNames:
+        | never
+    }
+    'src/pages/backups/index.vue': {
+      routes:
+        | '/backups/'
       views:
         | never
       pathParamNames:

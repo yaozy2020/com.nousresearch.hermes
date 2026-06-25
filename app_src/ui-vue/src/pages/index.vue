@@ -51,6 +51,98 @@ const timer = ref<number | null>(null)
 const panelVersion = computed(() => gateway.value?.version?.panel || '-')
 const hermesVersion = computed(() => gateway.value?.version?.hermes || '-')
 
+const upgradeStatus = ref<'idle' | 'checking' | 'has-update' | 'upgrading' | 'success' | 'error'>('idle')
+const upgradeLatest = ref<string | null>(null)
+const upgradeLogs = ref<string[]>([])
+const upgradeChecking = ref(false)
+const upgradeModalOpen = ref(false)
+const upgradeModalTarget = ref<string | null>(null)
+
+async function checkUpgrade() {
+  if (upgradeChecking.value) return
+  upgradeChecking.value = true
+  upgradeStatus.value = 'checking'
+  upgradeLogs.value = []
+  try {
+    const r = await api<VersionsResponse>('api/hermes/versions')
+    if (!r.installed) {
+      upgradeStatus.value = 'error'
+      showNotification('未检测到已安装的 hermes-agent', 'warning')
+      return
+    }
+    if (r.hasUpdate && r.latest) {
+      upgradeStatus.value = 'has-update'
+      upgradeLatest.value = r.latest
+    } else {
+      upgradeStatus.value = 'success'
+      upgradeLatest.value = null
+      showNotification('已是最新版本', 'success')
+    }
+  } catch (e: unknown) {
+    upgradeStatus.value = 'error'
+    showNotification('检查更新失败: ' + ((e as Error)?.message ?? String(e)), 'error')
+  } finally {
+    upgradeChecking.value = false
+  }
+}
+
+function openUpgradeConfirm() {
+  const target = upgradeLatest.value
+  if (!target) return
+  upgradeModalTarget.value = target
+  upgradeModalOpen.value = true
+}
+
+async function confirmUpgrade() {
+  const target = upgradeModalTarget.value
+  if (!target) return
+  upgradeModalOpen.value = false
+
+  upgradeStatus.value = 'upgrading'
+  upgradeLogs.value = []
+  try {
+    const r = await api<UpgradeStartResponse>('api/hermes/upgrade', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ target }),
+    })
+    if (!r.ok) throw new Error(r.error || '启动升级失败')
+    pollUpgrade(target)
+  } catch (e: unknown) {
+    upgradeStatus.value = 'error'
+    showNotification('升级失败: ' + ((e as Error)?.message ?? String(e)), 'error')
+  }
+}
+
+async function pollUpgrade(expectedVersion: string) {
+  const interval = setInterval(async () => {
+    try {
+      const [progress, logsRes] = await Promise.all([
+        api<UpgradeProgressResponse>('api/hermes/upgrade-in-progress').catch(() => ({ inProgress: true })),
+        api<UpgradeLogsResponse>('api/hermes/upgrade-logs').catch(() => ({ logs: [] })),
+      ])
+      if (logsRes.logs.length) {
+        upgradeLogs.value = logsRes.logs
+      }
+      if (!progress.inProgress) {
+        clearInterval(interval)
+        const latest = await api<VersionsResponse>('api/hermes/versions').catch(() => ({ current: null } as VersionsResponse))
+        if (latest.current === expectedVersion) {
+          upgradeStatus.value = 'success'
+          upgradeLatest.value = null
+          showNotification(`升级成功: ${expectedVersion}`, 'success')
+          refreshOverview()
+        } else {
+          upgradeStatus.value = 'error'
+          showNotification('升级失败', 'error')
+        }
+      }
+    } catch (e: unknown) {
+      console.error('upgrade poll error', e)
+    }
+  }, 1500)
+}
+
 async function refreshOverview(notify = false) {
   loading.value = true
   try {
@@ -536,6 +628,27 @@ onUnmounted(() => {
             <span class="text-[var(--ui-text-muted)]">Hermes</span>
             <span class="font-mono text-[var(--ui-text)]">{{ hermesVersion }}</span>
           </div>
+          <div class="pt-2 border-t border-[var(--ui-border)]">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-xs text-[var(--ui-text-muted)]">
+                <span v-if="upgradeStatus === 'checking'">检查中...</span>
+                <span v-else-if="upgradeStatus === 'has-update'">新版本 {{ upgradeLatest }}</span>
+                <span v-else-if="upgradeStatus === 'upgrading'">升级中...</span>
+                <span v-else-if="upgradeStatus === 'success'">已是最新</span>
+                <span v-else-if="upgradeStatus === 'error'">检查失败</span>
+                <span v-else>点击检查更新</span>
+              </span>
+              <UButton
+                size="xs"
+                variant="ghost"
+                :loading="upgradeChecking || upgradeStatus === 'upgrading'"
+                @click="upgradeStatus === 'has-update' ? openUpgradeConfirm() : checkUpgrade()"
+              >
+                {{ upgradeStatus === 'has-update' ? '升级' : '检查更新' }}
+              </UButton>
+            </div>
+            <pre v-if="upgradeLogs.length" class="mt-2 bg-[var(--ui-bg-elevated)] border border-[var(--ui-border)] rounded-md p-2 text-xs font-mono text-[var(--ui-text-muted)] whitespace-pre-wrap break-all max-h-[180px] overflow-y-auto">{{ upgradeLogs.join('\n') }}</pre>
+          </div>
         </div>
       </UCard>
 
@@ -548,6 +661,21 @@ onUnmounted(() => {
         </template>
         <pre class="bg-[var(--ui-bg-elevated)]/50 border border-[var(--ui-border)] rounded-lg p-3 text-xs font-mono text-[var(--ui-text-muted)] whitespace-pre-wrap break-all max-h-[220px] overflow-y-auto">{{ recentLogs }}</pre>
       </UCard>
+    </div>
+  </div>
+
+  <!-- 升级确认弹窗 -->
+  <div v-if="upgradeModalOpen" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div class="bg-[var(--ui-bg-card)] border border-[var(--ui-border)] rounded-xl shadow-xl max-w-sm w-full mx-4 p-5">
+      <h3 class="text-base font-semibold text-[var(--ui-text)] mb-2">确认升级</h3>
+      <p class="text-sm text-[var(--ui-text-muted)] mb-4">
+        确定升级到 hermes-agent <span class="font-mono">{{ upgradeModalTarget }}</span>？<br/>
+        升级前会自动备份数据目录，失败可回滚。
+      </p>
+      <div class="flex justify-end gap-2">
+        <UButton size="sm" variant="ghost" @click="upgradeModalOpen = false">取消</UButton>
+        <UButton size="sm" color="primary" :loading="upgradeStatus === 'upgrading'" @click="confirmUpgrade()">确定</UButton>
+      </div>
     </div>
   </div>
 </template>
