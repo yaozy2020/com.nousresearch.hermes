@@ -30,7 +30,7 @@ export function clearApiToken(): void {
   setApiToken('')
 }
 
-function getApiBase(): string {
+export function getApiBase(): string {
   if (typeof window === 'undefined') return '/'
   // 1) 优先读取 meta 注入值（推荐路径）
   try {
